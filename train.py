@@ -1,3 +1,4 @@
+import torch
 from torch import optim
 from torch.utils.data import DataLoader
 
@@ -49,11 +50,13 @@ def run_train():
                 optimizer.zero_grad()
             j += 1
 
-            print("iter: ", j, "%.4f, %.4f, %.4f, %.4f, %.4f"%(net.rpn_cls_loss.detach().numpy(),
-                                                               net.rpn_reg_loss.detach().numpy(),
-                                                               net.rcnn_cls_loss.detach().numpy(),
-                                                               net.rcnn_reg_loss.detach().numpy(),
-                                                               net.mask_cls_loss.detach().numpy()) )
+            print("iter: ", j, "%.4f, %.4f, %.4f, %.4f, %.4f"%(net.rpn_cls_loss.detach().cpu().numpy(),
+                                                               net.rpn_reg_loss.detach().cpu().numpy(),
+                                                               net.rcnn_cls_loss.detach().cpu().numpy(),
+                                                               net.rcnn_reg_loss.detach().cpu().numpy(),
+                                                               net.mask_cls_loss.detach().cpu().numpy()) )
+            if j%100 == 0:
+                torch.save(net.state_dict(), "%s.pth"%j)
 
 
 if __name__ == '__main__':

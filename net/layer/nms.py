@@ -7,8 +7,8 @@ from net.layer.rpn.rpn_utils import rpn_decode
 from net.layer.rcnn.rcnn_utils import rcnn_decode
 from net.utils.box_utils import clip_boxes, filter_boxes
 from net.utils.func_utils import np_softmax, np_sigmoid
-#from net.lib.gpu_nms.gpu_nms import nms
-from net.lib.nms.cython_nms import cython_nms
+from net.lib.gpu_nms.gpu_nms import gpu_nms
+#from net.lib.nms.cython_nms import cython_nms
 from net.lib.box_overlap.cython_box_overlap import cython_box_overlap
 
 
@@ -71,7 +71,7 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
                 rpn_proposals = rpn_proposals.detach().cpu().numpy()
             select = np.where(rpn_proposals[:, 0] == img_idx)[0]
             if len(select) == 0:
-                return torch.from_numpy(np.vstack(np.empty((0, 7), np.float32))).to(cfg.device)
+                return torch.from_numpy(np.vstack([np.empty((0, 7), np.float32)])).to(cfg.device)
             raw_box = rpn_proposals[select, 1:5]
             prob_distrib = np_softmax(logits[select])  # <todo>why not use np_sigmoid?
             delta_distrib = deltas[select]
@@ -91,7 +91,7 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
                 if len(keep) > 0:
                     box = box[keep]
                     prob = prob[keep]
-                    keep = cython_nms(np.hstack((box, prob)), nms_overlap_threshold)
+                    keep = gpu_nms(np.hstack((box, prob)), nms_overlap_threshold)
 
                     proposal = np.zeros((len(keep), 7), np.float32)
                     proposal[:, 0] = img_idx
@@ -216,7 +216,7 @@ def mask_nms(cfg, images, proposals, mask_logits):
                 mask_proposals.append(np.array([b, x0, y0, x1, y1, score, label], np.float32))
 
         if num_keeps==0:
-            mask_proposals = np.zeros((0,8  ),np.float32)
+            mask_proposals = np.zeros((0,7  ),np.float32)
             mask_instances = np.zeros((0,H,W),np.float32)
         else:
             mask_proposals = np.vstack(mask_proposals)

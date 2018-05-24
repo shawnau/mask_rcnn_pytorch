@@ -36,12 +36,12 @@ class MakeTarget:
         # data to return
         self.fg_index = None
         self.bg_index = None
-        self.box_label = np.zeros((0,), np.float32)
-        self.box_assign = np.zeros((0,), np.int32)
-        self.box_weight = np.zeros((0,), np.float32)
-        self.box_delta = np.zeros((0, 4), np.float32)
-        self.box_delta_weight = np.zeros((0,), np.float32)
-        self.instance = np.zeros((0, 1, 1), np.float32)
+        self.box_label = None
+        self.box_assign = None
+        self.box_weight = None
+        self.box_delta = None
+        self.box_delta_weight = None
+        self.instance = None
 
     def init_mode(self, cfg, mode):
         if mode in ['rpn']:
@@ -73,25 +73,25 @@ class MakeTarget:
         self.num_proposal = len(valid_index)
 
     def label_box(self):
-        label = np.zeros((self.num_proposal,), np.float32)
-        assign = np.zeros((self.num_proposal,), np.int32)
-        if self.num_proposal > 0:
-            overlap = cython_box_overlap(self.box, self.truth_box)
-            argmax_overlap = np.argmax(overlap, 1)  # assign truth box's index to each anchor
-            max_overlap = overlap[np.arange(self.num_proposal), argmax_overlap]
+        self.box_label = np.zeros((self.num_proposal,), np.int64)
+        self.box_assign = np.zeros((self.num_proposal,), np.int64)
+        self.box_weight = np.zeros((self.num_proposal,), np.float32)
+        if self.num_proposal <= 0 or self.num_truth_box <= 0: return
+        overlap = cython_box_overlap(self.box, self.truth_box)
+        argmax_overlap = np.argmax(overlap, 1)  # assign truth box's index to each anchor
+        max_overlap = overlap[np.arange(self.num_proposal), argmax_overlap]
 
         if self.mode in ['rpn']:
-            label_weight = np.zeros((self.num_proposal,), np.float32)
-            if self.num_proposal == 0: return
+            if self.num_proposal <= 0 or self.num_truth_box <= 0: return
             # label 1/0 for each anchor by threshold
             bg_index = max_overlap < self.bg_threshold_high
-            label[bg_index] = 0
-            label_weight[bg_index] = 1
+            self.box_label[bg_index] = 0
+            self.box_weight[bg_index] = 1
 
             fg_index = max_overlap >= self.fg_threshold_low
-            label[fg_index] = 1
-            label_weight[fg_index] = 1
-            assign[...] = argmax_overlap
+            self.box_label[fg_index] = 1
+            self.box_weight[fg_index] = 1
+            self.box_assign[...] = argmax_overlap
 
             # each ground_truth box must be assigned
             # re-assign less overlapped gt to anchor_boxes, nomatter it's box_overlap
@@ -100,25 +100,20 @@ class MakeTarget:
             proposal_to_truth, truth_to_proposal = np.where(overlap == max_overlap)
 
             fg_index = proposal_to_truth
-            label[fg_index] = 1
-            label_weight[fg_index] = 1
-            assign[fg_index] = truth_to_proposal
-            self.fg_index = np.where((label_weight != 0) & (label != 0))[0]
-            self.bg_index = np.where((label_weight != 0) & (label == 0))[0]
+            self.box_label[fg_index] = 1
+            self.box_weight[fg_index] = 1
+            self.box_assign[fg_index] = truth_to_proposal
+            self.fg_index = np.where((self.box_weight != 0) & (self.box_label != 0))[0]
+            self.bg_index = np.where((self.box_weight != 0) & (self.box_label == 0))[0]
 
             # re-weight by rareness
             num_fg = len(self.fg_index)
             num_bg = len(self.bg_index)
-            label_weight[fg_index] = 1
-            label_weight[bg_index] = num_fg / num_bg
-
-            # label, assign, weight
-            self.box_label = label
-            self.box_assign = assign
-            self.box_weight = label_weight
+            self.box_weight[fg_index] = 1
+            self.box_weight[bg_index] = num_fg / num_bg
 
         if self.mode in ['rcnn', 'mask']:
-            if self.num_proposal == 0: return
+            if self.num_proposal <= 0 or self.num_truth_box <= 0: return
             self.fg_index = np.where(max_overlap >= self.fg_threshold_low)[0]
             if self.mode == 'rcnn':
                 self.bg_index = np.where((max_overlap < self.bg_threshold_high) & \
@@ -138,20 +133,10 @@ class MakeTarget:
             self.box_label[len(self.fg_index):] = 0  # clamp labels for the background to 0
             self.num_proposal = len(subsample_index)
 
-        if self.mode == 'mask':
-            resized_instance = []
-            for i in range(len(self.fg_index)):
-                instance = self.truth_instance[self.box_assign[i]]
-                box = self.box[i]
-                crop = resize_instance(instance, box, self.mask_size)
-                resized_instance.append(crop[np.newaxis, :, :])
-            resized_instance = np.vstack(resized_instance)
-            self.instance = resized_instance
-
     def box_regression(self):
         self.box_delta = np.zeros((self.num_proposal, 4), np.float32)
         self.box_delta_weight = np.zeros((self.num_proposal,), np.float32)
-        if self.num_proposal == 0: return
+        if self.num_proposal <= 0 or self.num_truth_box <= 0: return
 
         if self.mode in ['rpn']:
             fg_box = self.box[self.fg_index]  # calculate foreground only
@@ -163,6 +148,18 @@ class MakeTarget:
             truth_box = self.truth_box[self.box_assign[:len(self.fg_index)]]
             fg_box = self.box[:len(self.fg_index)]
             self.box_delta = rcnn_encode(fg_box, truth_box)
+
+    def make_instance(self):
+        self.instance = np.zeros((self.num_proposal, self.mask_size, self.mask_size), np.float32)
+        if self.num_proposal <= 0 or self.num_truth_box <= 0: return
+        resized_instance = []
+        for i in range(len(self.fg_index)):
+            instance = self.truth_instance[self.box_assign[i]]
+            box = self.box[i]
+            crop = resize_instance(instance, box, self.mask_size)
+            resized_instance.append(crop[np.newaxis, :, :])
+        resized_instance = np.vstack(resized_instance)
+        self.instance = resized_instance
 
     def balance(self, fg_index, bg_index):
         """
@@ -224,6 +221,7 @@ def add_truth_box_to_proposal(proposal, img_idx, truth_box, truth_label, score=-
     :param score:
     :return:
     """
+    print(truth_box.shape)
     num_truth = len(truth_box)
     if num_truth != 0:
         truth = np.zeros((num_truth, 7), np.float32)
@@ -330,6 +328,7 @@ def make_mask_target(cfg, proposal_batch, truth_box_batch, truth_label_batch, tr
         t = MakeTarget(cfg, 'mask', proposal, truth_box, truth_label, truth_instance)
         t.filter_box()
         t.label_box()
+        t.make_instance()
 
         proposal = torch.from_numpy(t.proposal).to(t.device)
         label = torch.from_numpy(t.box_label).to(t.device)

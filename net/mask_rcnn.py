@@ -11,7 +11,10 @@ from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes, rpn_cls_loss, rpn_reg
 from net.layer.rcnn.rcnn_utils import rcnn_cls_loss, rcnn_reg_loss
 from net.layer.mask.mask_utils import make_empty_masks, mask_loss
 
-from net.layer.target import make_rpn_target, make_rcnn_target, make_mask_target
+from net.layer.rpn.rpn_target import make_rpn_target
+from net.layer.rcnn.rcnn_target import make_rcnn_target
+from net.layer.mask.mask_target import make_mask_target
+
 from net.layer.nms import rpn_nms, rcnn_nms, mask_nms
 
 
@@ -76,6 +79,7 @@ class MaskRcnnNet(nn.Module):
             self.sampled_mask_labels, \
             self.sampled_mask_instances,   = \
                 make_mask_target(self.cfg,
+                                 images,
                                  self.rcnn_proposals,
                                  truth_boxes,
                                  truth_labels,
