@@ -1,15 +1,14 @@
 import unittest
 from torch.utils.data import DataLoader
 from loader.dsb2018.train_utils import *
-from visualize_utils.draw import image_show, draw_boxes, instances_to_contour_overlay
 
-from net.layer.rpn.rpn_nms import rpn_make_anchor_boxes
+from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes, rpn_cls_loss, rpn_reg_loss
 from net.layer.target import make_rpn_target, make_mask_target, make_rcnn_target
-from net.configuration import Configuration
+from configuration import Configuration
 
-from net.layer.rpn.rpn_loss import rpn_cls_loss, rpn_reg_loss
-from net.layer.rcnn.rcnn_loss import rcnn_cls_loss, rcnn_reg_loss
-from net.layer.mask.mask_loss import mask_loss
+from net.layer.rcnn.rcnn_utils import rcnn_reg_loss, rcnn_cls_loss
+from net.layer.mask.mask_utils import mask_loss
+
 
 class TestTarget(unittest.TestCase):
     """
@@ -27,6 +26,7 @@ class TestTarget(unittest.TestCase):
     """
     def setUp(self):
         self.cfg = Configuration()
+        self.cfg.data_dir = 'test_data/'
         # loader
         train_dataset = ScienceDataset(self.cfg, mode='train', transform=train_augment)
         self.train_loader = DataLoader(
@@ -153,7 +153,6 @@ class TestTarget(unittest.TestCase):
                                  sampled_labels,
                                  sampled_instances)
             print('mask loss: ', cls_loss)
-
 
 
 if __name__ == '__main__':

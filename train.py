@@ -1,7 +1,7 @@
 from torch import optim
 from torch.utils.data import DataLoader
 
-from net.configuration import Configuration
+from configuration import Configuration
 from net.mask_rcnn import MaskRcnnNet
 
 from loader.dsb2018.train_utils import *

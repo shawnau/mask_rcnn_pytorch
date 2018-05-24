@@ -1,7 +1,5 @@
 import unittest
-
 import numpy as np
-
 from net.lib.box_overlap.cython_box_overlap import cython_box_overlap
 
 

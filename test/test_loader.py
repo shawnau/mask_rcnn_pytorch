@@ -7,7 +7,7 @@ from visualize_utils.draw import image_show, draw_boxes, instances_to_contour_ov
 class Configuration:
     def __init__(self):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.data_dir = 'data'
+        self.data_dir = 'test_data/'
         self.batch_size = 10
 
 

@@ -1,8 +1,33 @@
+import numpy as np
 import torch
-from net.configuration import Configuration
+from skimage import morphology
 from net.utils.func_utils import binary_cross_entropy_with_logits
 
-cfg = Configuration()
+
+def make_empty_masks(cfg, mode, inputs):
+    masks = []
+    batch_size, C, H, W = inputs.size()
+    for b in range(batch_size):
+        mask = np.zeros((H, W), np.float32)
+        masks.append(mask)
+    return masks
+
+
+def instance_to_binary(instance, threshold, min_area):
+    binary = instance > threshold
+    label  = morphology.label(binary)
+    num_labels = label.max()
+    if num_labels>0:
+        areas    = [(label==c+1).sum() for c in range(num_labels)]
+        max_area = max(areas)
+
+        for c in range(num_labels):
+            if areas[c] != max_area:
+                binary[label==c+1]=0
+            else:
+                if max_area<min_area:
+                    binary[label==c+1]=0
+    return binary
 
 
 def mask_loss(logits, labels, instances):
@@ -18,7 +43,7 @@ def mask_loss(logits, labels, instances):
     dim = logits_flat.size(2)
 
     # one hot encode
-    select = torch.zeros((batch_size, num_classes)).to(cfg.device)
+    select = torch.zeros((batch_size, num_classes)).to(logits.device)
     select.scatter_(1, labels.view(-1, 1), 1)
     select[:, 0] = 0
     select = select.view(batch_size, num_classes, 1).expand((batch_size, num_classes, dim)).contiguous().byte()

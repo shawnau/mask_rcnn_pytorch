@@ -3,14 +3,16 @@ import unittest
 
 from net.layer.backbone.SE_ResNeXt_FPN import SEResNeXtFPN
 from net.layer.rpn.rpn_head import RpnMultiHead
-from net.layer.rpn.rpn_nms import rpn_make_anchor_boxes
+from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes
 from net.layer.roi_align.crop import CropRoi
 from net.layer.rcnn.rcnn_head import RcnnHead
 from net.layer.mask.mask_head import MaskHead
 
+
 class Configuration:
     def __init__(self):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.data_dir = 'test_data/'
         # data parameters
         self.num_classes = 2
         # rpn parameters

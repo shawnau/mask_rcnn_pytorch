@@ -1,9 +1,10 @@
 import torch
-from skimage import morphology
 import cv2
 import numpy as np
-from net.layer.rpn.rpn_nms import rpn_decode
-from net.layer.rcnn.rcnn_nms import rcnn_decode
+
+from net.layer.mask.mask_utils import instance_to_binary
+from net.layer.rpn.rpn_utils import rpn_decode
+from net.layer.rcnn.rcnn_utils import rcnn_decode
 from net.utils.box_utils import clip_boxes, filter_boxes
 from net.utils.func_utils import np_softmax, np_sigmoid
 from net.lib.nms.cython_nms import cython_nms
@@ -109,32 +110,6 @@ def rpn_nms(cfg, mode, images, anchor_boxes, logits_flat, deltas_flat):
 
 def rcnn_nms(cfg, mode, images, rpn_proposals, logits, deltas):
     return _nms(cfg, mode, 'rcnn', rcnn_decode, images, logits, deltas, rpn_proposals=rpn_proposals)
-
-
-def make_empty_masks(cfg, mode, inputs):
-    masks = []
-    batch_size, C, H, W = inputs.size()
-    for b in range(batch_size):
-        mask = np.zeros((H, W), np.float32)
-        masks.append(mask)
-    return masks
-
-
-def instance_to_binary(instance, threshold, min_area):
-    binary = instance > threshold
-    label  = morphology.label(binary)
-    num_labels = label.max()
-    if num_labels>0:
-        areas    = [(label==c+1).sum() for c in range(num_labels)]
-        max_area = max(areas)
-
-        for c in range(num_labels):
-            if areas[c] != max_area:
-                binary[label==c+1]=0
-            else:
-                if max_area<min_area:
-                    binary[label==c+1]=0
-    return binary
 
 
 def mask_nms(cfg, images, proposals, mask_logits):

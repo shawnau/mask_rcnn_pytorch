@@ -2,16 +2,14 @@ import unittest
 from torch.utils.data import DataLoader
 from loader.dsb2018.train_utils import *
 
-from net.configuration import Configuration
+from configuration import Configuration
 from net.layer.rpn.rpn_head import RpnMultiHead
-from net.layer.rpn.rpn_nms import rpn_make_anchor_boxes
+from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes
 from net.layer.rcnn.rcnn_head import RcnnHead
 from net.layer.mask.mask_head import MaskHead
 
-from net.layer.rpn.rpn_nms import rpn_nms
-from net.layer.rcnn.rcnn_nms import rcnn_nms
-#from net.layer.nms import rpn_nms, rcnn_nms
-#from net.layer.mask.mask_nms import mask_nms
+from net.layer.nms import rpn_nms, rcnn_nms, mask_nms
+
 
 class TestNms(unittest.TestCase):
     """
@@ -29,6 +27,7 @@ class TestNms(unittest.TestCase):
     """
     def setUp(self):
         self.cfg = Configuration()
+        self.cfg.data_dir = 'test_data/'
         # loader
         train_dataset = ScienceDataset(self.cfg, mode='train', transform=train_augment)
         self.train_loader = DataLoader(

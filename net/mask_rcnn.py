@@ -1,19 +1,20 @@
-from net.layer.rpn.rpn_head import *
-from net.layer.rpn.rpn_loss import *
-from net.layer.rpn.rpn_nms import *
+import torch
+from torch import nn
 
-from net.layer.rcnn.rcnn_head import *
-from net.layer.rcnn.rcnn_loss import *
-from net.layer.rcnn.rcnn_nms import *
-
-from net.layer.mask.mask_head import *
-from net.layer.mask.mask_loss import *
-from net.layer.mask.mask_nms import *
-
-from net.layer.roi_align.crop import CropRoi
 from net.layer.backbone.SE_ResNeXt_FPN import SEResNeXtFPN
+from net.layer.rpn.rpn_head import RpnMultiHead
+from net.layer.rcnn.rcnn_head import RcnnHead
+from net.layer.mask.mask_head import MaskHead
+from net.layer.roi_align.crop import CropRoi
+
+from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes, rpn_cls_loss, rpn_reg_loss
+from net.layer.rcnn.rcnn_utils import rcnn_cls_loss, rcnn_reg_loss
+from net.layer.mask.mask_utils import make_empty_masks, mask_loss
 
 from net.layer.target import make_rpn_target, make_rcnn_target, make_mask_target
+from net.layer.nms import rpn_nms, rcnn_nms, mask_nms
+
+
 class MaskRcnnNet(nn.Module):
 
     def __init__(self, cfg):
@@ -120,7 +121,6 @@ class MaskRcnnNet(nn.Module):
                           self.mask_cls_loss
 
         return self.total_loss
-
 
     def set_mode(self, mode ):
         self.mode = mode

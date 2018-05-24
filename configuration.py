@@ -1,13 +1,12 @@
 import torch
 
-class Configuration(object):
 
+class Configuration(object):
     def __init__(self):
         super(Configuration, self).__init__()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.version = 'SE-FPN-ResNeXt50'
-        self.data_dir = 'test_data/' # for test
-        #self.data_dir = 'test/data/' # for train
+        self.data_dir = 'test/data/'
         # net
         # include background class
         self.num_classes = 2

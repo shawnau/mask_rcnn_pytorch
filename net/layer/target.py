@@ -3,8 +3,8 @@ import torch
 import numpy as np
 from net.lib.box_overlap.cython_box_overlap import cython_box_overlap
 from net.utils.box_utils import is_small_box, resize_instance
-from net.layer.rpn.rpn_nms import rpn_encode
-from net.layer.rcnn.rcnn_nms import rcnn_encode
+from net.layer.rpn.rpn_utils import rpn_encode
+from net.layer.rcnn.rcnn_utils import rcnn_encode
 
 
 class MakeTarget:
@@ -146,7 +146,6 @@ class MakeTarget:
                 resized_instance.append(crop[np.newaxis, :, :])
             resized_instance = np.vstack(resized_instance)
             self.instance = resized_instance
-
 
     def box_regression(self):
         if self.mode in ['rpn']:
