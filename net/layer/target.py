@@ -36,30 +36,30 @@ class MakeTarget:
         # data to return
         self.fg_index = None
         self.bg_index = None
-        self.box_label = None
-        self.box_assign = None
-        self.box_weight = None
-        self.box_delta = None
-        self.box_delta_weight = None
-        self.instance = None
+        self.box_label = np.zeros((0,), np.float32)
+        self.box_assign = np.zeros((0,), np.int32)
+        self.box_weight = np.zeros((0,), np.float32)
+        self.box_delta = np.zeros((0, 4), np.float32)
+        self.box_delta_weight = np.zeros((0,), np.float32)
+        self.instance = np.zeros((0, 1, 1), np.float32)
 
     def init_mode(self, cfg, mode):
         if mode in ['rpn']:
-            self.fg_threshold_low  = cfg.rpn_train_fg_thresh_low
+            self.fg_threshold_low = cfg.rpn_train_fg_thresh_low
             self.bg_threshold_high = cfg.rpn_train_bg_thresh_high
         elif mode in ['rcnn']:
-            self.fg_threshold_low  = cfg.rcnn_train_fg_thresh_low
+            self.fg_threshold_low = cfg.rcnn_train_fg_thresh_low
             self.bg_threshold_high = cfg.rcnn_train_bg_thresh_high
-            self.bg_threshold_low  = cfg.rcnn_train_bg_thresh_low
-            self.resample_size     = cfg.rcnn_train_batch_size
-            self.fg_ratio          = cfg.rcnn_train_fg_fraction
-            self.min_box_size      = cfg.mask_train_min_size
+            self.bg_threshold_low = cfg.rcnn_train_bg_thresh_low
+            self.resample_size = cfg.rcnn_train_batch_size
+            self.fg_ratio = cfg.rcnn_train_fg_fraction
+            self.min_box_size = cfg.mask_train_min_size
         elif mode in ['mask']:
-            self.fg_threshold_low  = cfg.mask_train_fg_thresh_low
-            self.resample_size     = cfg.mask_train_batch_size
+            self.fg_threshold_low = cfg.mask_train_fg_thresh_low
+            self.resample_size = cfg.mask_train_batch_size
             self.fg_ratio = 1.0
-            self.min_box_size      = cfg.mask_train_min_size
-            self.mask_size         = cfg.mask_size
+            self.min_box_size = cfg.mask_train_min_size
+            self.mask_size = cfg.mask_size
 
     def filter_box(self):
         valid_index = []
@@ -75,14 +75,14 @@ class MakeTarget:
     def label_box(self):
         label = np.zeros((self.num_proposal,), np.float32)
         assign = np.zeros((self.num_proposal,), np.int32)
-
-        overlap = cython_box_overlap(self.box, self.truth_box)
-        argmax_overlap = np.argmax(overlap, 1)  # assign truth box's index to each anchor
-        max_overlap = overlap[np.arange(self.num_proposal), argmax_overlap]
+        if self.num_proposal > 0:
+            overlap = cython_box_overlap(self.box, self.truth_box)
+            argmax_overlap = np.argmax(overlap, 1)  # assign truth box's index to each anchor
+            max_overlap = overlap[np.arange(self.num_proposal), argmax_overlap]
 
         if self.mode in ['rpn']:
             label_weight = np.zeros((self.num_proposal,), np.float32)
-
+            if self.num_proposal == 0: return
             # label 1/0 for each anchor by threshold
             bg_index = max_overlap < self.bg_threshold_high
             label[bg_index] = 0
@@ -117,11 +117,12 @@ class MakeTarget:
             self.box_assign = assign
             self.box_weight = label_weight
 
-        elif self.mode in ['rcnn', 'mask']:
+        if self.mode in ['rcnn', 'mask']:
+            if self.num_proposal == 0: return
             self.fg_index = np.where(max_overlap >= self.fg_threshold_low)[0]
             if self.mode == 'rcnn':
                 self.bg_index = np.where((max_overlap < self.bg_threshold_high) & \
-                                        (max_overlap >= self.bg_threshold_low))[0]
+                                         (max_overlap >= self.bg_threshold_low))[0]
             elif self.mode == 'mask':
                 self.bg_index = np.array([])
             self.fg_index, self.bg_index = self.balance(self.fg_index, self.bg_index)
@@ -131,9 +132,9 @@ class MakeTarget:
         if self.mode in ['rcnn', 'mask']:
             subsample_index = np.concatenate([self.fg_index, self.bg_index], 0).astype(np.int64)  # int64+empty=float64
             self.proposal = self.proposal[subsample_index]
-            self.box      = self.box[subsample_index]
+            self.box = self.box[subsample_index]
             self.box_assign = argmax_overlap[subsample_index]
-            self.box_label  = self.truth_label[self.box_assign]
+            self.box_label = self.truth_label[self.box_assign]
             self.box_label[len(self.fg_index):] = 0  # clamp labels for the background to 0
             self.num_proposal = len(subsample_index)
 
@@ -148,24 +149,20 @@ class MakeTarget:
             self.instance = resized_instance
 
     def box_regression(self):
-        if self.mode in ['rpn']:
-            box_delta = np.zeros((self.num_proposal, 4), np.float32)
-            box_delta_weight = np.zeros((self.num_proposal,), np.float32)
+        self.box_delta = np.zeros((self.num_proposal, 4), np.float32)
+        self.box_delta_weight = np.zeros((self.num_proposal,), np.float32)
+        if self.num_proposal == 0: return
 
+        if self.mode in ['rpn']:
             fg_box = self.box[self.fg_index]  # calculate foreground only
             truth_box = self.truth_box[self.box_assign[self.fg_index]]
-            box_delta[self.fg_index] = rpn_encode(fg_box, truth_box)
-            box_delta_weight[self.fg_index] = self.box_weight[self.fg_index]
-
-            self.box_delta = box_delta
-            self.box_delta_weight = box_delta_weight
+            self.box_delta[self.fg_index] = rpn_encode(fg_box, truth_box)
+            self.box_delta_weight[self.fg_index] = self.box_weight[self.fg_index]
 
         elif self.mode in ['rcnn']:
             truth_box = self.truth_box[self.box_assign[:len(self.fg_index)]]
             fg_box = self.box[:len(self.fg_index)]
-            box_delta = rcnn_encode(fg_box, truth_box)
-
-            self.box_delta = box_delta
+            self.box_delta = rcnn_encode(fg_box, truth_box)
 
     def balance(self, fg_index, bg_index):
         """
@@ -216,34 +213,6 @@ class MakeTarget:
         assert ((num_fg + num_bg) == num)
         return fg_index, bg_index
 
-    def make_target(self):
-        if self.mode in ['rcnn', 'mask']:
-            self.filter_box()
-
-        self.label_box()
-
-        if self.mode in ['rpn', 'rcnn']:
-            self.box_regression()
-
-        if self.mode == 'rpn':
-            label         = torch.from_numpy(self.box_label).to(self.device)
-            label_assign  = torch.from_numpy(self.box_assign).to(self.device)
-            label_weight  = torch.from_numpy(self.box_weight).to(self.device)
-            target        = torch.from_numpy(self.box_delta).to(self.device)
-            target_weight = torch.from_numpy(self.box_delta_weight).to(self.device)
-            return label, label_assign, label_weight, target, target_weight
-        elif self.mode == 'rcnn':
-            proposal      = torch.from_numpy(self.proposal).to(self.device)
-            label         = torch.from_numpy(self.box_label).to(self.device)
-            assign        = torch.from_numpy(self.box_assign).to(self.device)
-            target        = torch.from_numpy(self.box_delta).to(self.device)
-            return proposal, label, assign, target
-        elif self.mode == 'mask':
-            proposal      = torch.from_numpy(self.proposal).to(self.device)
-            label         = torch.from_numpy(self.box_label).to(self.device)
-            instance      = torch.from_numpy(self.instance).to(self.device)
-            return proposal, label, instance
-
 
 def add_truth_box_to_proposal(proposal, img_idx, truth_box, truth_label, score=-1):
     """
@@ -258,10 +227,10 @@ def add_truth_box_to_proposal(proposal, img_idx, truth_box, truth_label, score=-
     num_truth = len(truth_box)
     if num_truth != 0:
         truth = np.zeros((num_truth, 7), np.float32)
-        truth[:, 0]   = img_idx
+        truth[:, 0] = img_idx
         truth[:, 1:5] = truth_box
-        truth[:, 5]   = score
-        truth[:, 6]   = truth_label
+        truth[:, 5] = score
+        truth[:, 6] = truth_label
     else:
         truth = np.zeros((0, 7), np.float32)
     total_proposals = np.vstack([proposal, truth])
@@ -269,16 +238,24 @@ def add_truth_box_to_proposal(proposal, img_idx, truth_box, truth_label, score=-
 
 
 def make_rpn_target(cfg, anchor_boxes, truth_box_batch):
-    box_label_batch  = []
+    box_label_batch = []
     box_assign_batch = []
     box_label_weight_batch = []
-    box_delta        = []
+    box_delta = []
     box_delta_weight = []
 
     for b in range(len(truth_box_batch)):
         truth_box = truth_box_batch[b]
-        label, label_assign, label_weight, target, target_weight = \
-            MakeTarget(cfg, 'rpn', anchor_boxes, truth_box).make_target()
+
+        t = MakeTarget(cfg, 'rpn', anchor_boxes, truth_box)
+        t.label_box()
+        t.box_regression()
+
+        label = torch.from_numpy(t.box_label).to(t.device)
+        label_assign = torch.from_numpy(t.box_assign).to(t.device)
+        label_weight = torch.from_numpy(t.box_weight).to(t.device)
+        target = torch.from_numpy(t.box_delta).to(t.device)
+        target_weight = torch.from_numpy(t.box_delta_weight).to(t.device)
 
         box_label_batch.append(label.view(1, -1))
         box_assign_batch.append(label_assign.view(1, -1))
@@ -286,17 +263,17 @@ def make_rpn_target(cfg, anchor_boxes, truth_box_batch):
         box_delta.append(target.view(1, -1, 4))
         box_delta_weight.append(target_weight.view(1, -1))
 
-    box_label_batch  = torch.cat(box_label_batch, 0)
+    box_label_batch = torch.cat(box_label_batch, 0)
     box_assign_batch = torch.cat(box_assign_batch, 0)
     box_label_weight_batch = torch.cat(box_label_weight_batch, 0)
-    box_delta        = torch.cat(box_delta, 0)
+    box_delta = torch.cat(box_delta, 0)
     box_delta_weight = torch.cat(box_delta_weight, 0)
 
     return box_label_batch, box_assign_batch, box_label_weight_batch, box_delta, box_delta_weight
 
 
 def make_rcnn_target(cfg, proposal_batch, truth_box_batch, truth_label_batch):
-    truth_box_batch   = copy.deepcopy(truth_box_batch)
+    truth_box_batch = copy.deepcopy(truth_box_batch)
     truth_label_batch = copy.deepcopy(truth_label_batch)
 
     sampled_proposal = []
@@ -310,25 +287,33 @@ def make_rcnn_target(cfg, proposal_batch, truth_box_batch, truth_label_batch):
         truth_label = truth_label_batch[b]
 
         proposal = add_truth_box_to_proposal(proposal, b, truth_box, truth_label)
-        proposal, label, label_assign, target = \
-            MakeTarget(cfg, 'rcnn', proposal, truth_box, truth_label).make_target()
+
+        t = MakeTarget(cfg, 'rcnn', proposal, truth_box, truth_label)
+        t.filter_box()
+        t.label_box()
+        t.box_regression()
+
+        proposal = torch.from_numpy(t.proposal).to(t.device)
+        label = torch.from_numpy(t.box_label).to(t.device)
+        label_assign = torch.from_numpy(t.box_assign).to(t.device)
+        delta = torch.from_numpy(t.box_delta).to(t.device)
 
         sampled_proposal.append(proposal)
         box_label_batch.append(label)
         box_assign_batch.append(label_assign)
-        box_delta.append(target)
+        box_delta.append(delta)
 
     sampled_proposal = torch.cat(sampled_proposal, 0)
-    box_label_batch  = torch.cat(box_label_batch, 0)
+    box_label_batch = torch.cat(box_label_batch, 0)
     box_assign_batch = np.hstack(box_assign_batch)
-    box_delta        = torch.cat(box_delta, 0)
+    box_delta = torch.cat(box_delta, 0)
 
     return sampled_proposal, box_label_batch, box_assign_batch, box_delta
 
 
 def make_mask_target(cfg, proposal_batch, truth_box_batch, truth_label_batch, truth_instance_batch):
-    truth_box_batch      = copy.deepcopy(truth_box_batch)
-    truth_label_batch    = copy.deepcopy(truth_label_batch)
+    truth_box_batch = copy.deepcopy(truth_box_batch)
+    truth_label_batch = copy.deepcopy(truth_label_batch)
     truth_instance_batch = copy.deepcopy(truth_instance_batch)
 
     sampled_proposal = []
@@ -336,21 +321,26 @@ def make_mask_target(cfg, proposal_batch, truth_box_batch, truth_label_batch, tr
     sampled_truth_instance = []
 
     for b in range(len(truth_box_batch)):
-        proposal       = proposal_batch[proposal_batch[:, 0] == b]
-        truth_box      = truth_box_batch[b]
-        truth_label    = truth_label_batch[b]
+        proposal = proposal_batch[proposal_batch[:, 0] == b]
+        truth_box = truth_box_batch[b]
+        truth_label = truth_label_batch[b]
         truth_instance = truth_instance_batch[b]
 
         proposal = add_truth_box_to_proposal(proposal, b, truth_box, truth_label)
-        proposal, label, instance = \
-            MakeTarget(cfg, 'mask', proposal, truth_box, truth_label, truth_instance).make_target()
+        t = MakeTarget(cfg, 'mask', proposal, truth_box, truth_label, truth_instance)
+        t.filter_box()
+        t.label_box()
+
+        proposal = torch.from_numpy(t.proposal).to(t.device)
+        label = torch.from_numpy(t.box_label).to(t.device)
+        instance = torch.from_numpy(t.instance).to(t.device)
 
         sampled_proposal.append(proposal)
         box_label_batch.append(label)
         sampled_truth_instance.append(instance)
 
     sampled_proposal = torch.cat(sampled_proposal, 0)
-    box_label_batch  = torch.cat(box_label_batch, 0)
+    box_label_batch = torch.cat(box_label_batch, 0)
     sampled_truth_instance = torch.cat(sampled_truth_instance, 0)
 
     return sampled_proposal, box_label_batch, sampled_truth_instance

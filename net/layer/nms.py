@@ -7,6 +7,7 @@ from net.layer.rpn.rpn_utils import rpn_decode
 from net.layer.rcnn.rcnn_utils import rcnn_decode
 from net.utils.box_utils import clip_boxes, filter_boxes
 from net.utils.func_utils import np_softmax, np_sigmoid
+#from net.lib.gpu_nms.gpu_nms import nms
 from net.lib.nms.cython_nms import cython_nms
 from net.lib.box_overlap.cython_box_overlap import cython_box_overlap
 
@@ -51,8 +52,8 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
         raise ValueError('rpn_nms(): invalid mode = %s?' % mode)
 
     num_classes = 2 if head == 'rpn' else cfg.num_classes
-    logits = logits.detach().numpy()
-    deltas = deltas.detach().numpy() if head == 'rpn' else deltas.detach().numpy().reshape(-1, num_classes, 4)
+    logits = logits.detach().cpu().numpy()
+    deltas = deltas.detach().cpu().numpy() if head == 'rpn' else deltas.detach().cpu().numpy().reshape(-1, num_classes, 4)
     batch_size, _, height, width = images.size()
 
     # non-max suppression
@@ -66,6 +67,8 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
             delta_distrib = deltas[img_idx]  # (N, 2, 4)
         else:  # rcnn
             assert  rpn_proposals is not None
+            if type(rpn_proposals) is torch.Tensor:
+                rpn_proposals = rpn_proposals.detach().cpu().numpy()
             select = np.where(rpn_proposals[:, 0] == img_idx)[0]
             if len(select) == 0:
                 return torch.from_numpy(np.vstack(np.empty((0, 7), np.float32))).to(cfg.device)
