@@ -72,8 +72,8 @@ class Configuration(object):
         # optim -----------------------------------------------------------------
         self.lr = 0.01
         self.iter_accum = 1  # learning rate = lr/iter_accum
-        self.batch_size = 1
-        self.num_iters = 2000
-        self.iter_smooth = 20  # calculate smoothed loss over each 20 iter
-        self.iter_valid = 1
-        self.iter_save = 1000
+        self.batch_size = 10
+        self.num_iters = 20000
+        self.iter_smooth = 1  # calculate smoothed loss over each 20 iter
+        self.iter_valid = 10
+        self.iter_save = 100
