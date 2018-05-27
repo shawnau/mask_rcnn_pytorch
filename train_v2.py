@@ -16,7 +16,7 @@ def validate(cfg, net, test_loader):
     test_num  = 0
     test_loss = np.zeros(6, np.float32)
 
-    for i, (inputs, truth_boxes, truth_labels, truth_instances, metas, indices) in enumerate(test_loader, 0):
+    for inputs, truth_boxes, truth_labels, truth_instances, indices in test_loader:
 
         with torch.no_grad():
             net(inputs.to(cfg.device), truth_boxes, truth_labels, truth_instances)
@@ -136,7 +136,7 @@ def run_train():
                          time_to_str((timer() - start)/60)))
                 time.sleep(0.01)
             # save checkpoint_dir -------------------------------------------------
-            if i in cfg.iter_save:
+            if i % cfg.iter_save == 0:
                 model_path = os.path.join('%08d_model.pth' % i)
                 optimizer_path = os.path.join('%08d_optimizer.pth' % i)
 
@@ -159,7 +159,7 @@ def run_train():
                 optimizer.zero_grad()
 
             # print statistics  -------------------------------------------------
-            batch_acc  = 0 #acc[0][0]
+            batch_acc  = 0
             batch_loss = np.array((
                            loss.cpu().data.numpy(),
                            net.rpn_cls_loss.cpu().data.numpy(),

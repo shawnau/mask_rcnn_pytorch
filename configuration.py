@@ -75,5 +75,5 @@ class Configuration(object):
         self.batch_size = 1
         self.num_iters = 2000
         self.iter_smooth = 20  # calculate smoothed loss over each 20 iter
-        self.iter_valid = 10
+        self.iter_valid = 1
         self.iter_save = 1000
