@@ -1,11 +1,10 @@
-import numpy as np
 import torch
 import unittest
 
 from net.layer.backbone.SE_ResNeXt_FPN import SEResNeXtFPN
 from net.layer.rpn.rpn_head import RpnMultiHead
 from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes
-from net.layer.roi_align.crop import CropRoi
+from net.layer.roi_align import RoiAlign
 from net.layer.rcnn.rcnn_head import RcnnHead
 from net.layer.mask.mask_head import MaskHead
 
@@ -99,7 +98,7 @@ class TestROIAlign(unittest.TestCase):
         p5 = torch.randn(5, 256, 16, 16)
         self.fs = [p2, p3, p4, p5]
         print('=' * 10 + 'Test ROI Align' + '=' * 10)
-        self.net = CropRoi(self.cfg, self.cfg.rcnn_crop_size)
+        self.net = RoiAlign(self.cfg, self.cfg.rcnn_crop_size)
 
     def test_forward(self):
         # [i, x0, y0, x1, y1, score, label]

@@ -6,9 +6,9 @@ from net.lib.roi_align.module import RoIAlign as Crop
 
 
 # https://qiita.com/yu4u/items/5cbe9db166a5d72f9eb8
-class CropRoi(nn.Module):
+class RoiAlign(nn.Module):
     def __init__(self, cfg, crop_size):
-        super(CropRoi, self).__init__()
+        super(RoiAlign, self).__init__()
         self.cfg = cfg
         self.num_scales = len(cfg.rpn_scales)
         self.crop_size  = crop_size

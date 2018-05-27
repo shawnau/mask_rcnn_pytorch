@@ -5,7 +5,7 @@ from net.layer.backbone.SE_ResNeXt_FPN import SEResNeXtFPN
 from net.layer.rpn.rpn_head import RpnMultiHead
 from net.layer.rcnn.rcnn_head import RcnnHead
 from net.layer.mask.mask_head import MaskHead
-from net.layer.roi_align.crop import CropRoi
+from net.layer.roi_align import RoiAlign
 
 from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes, rpn_cls_loss, rpn_reg_loss
 from net.layer.rcnn.rcnn_utils import rcnn_cls_loss, rcnn_reg_loss
@@ -30,9 +30,9 @@ class MaskRcnnNet(nn.Module):
         crop_channels = feature_channels
         self.feature_net = SEResNeXtFPN([3, 4, 6, 3])
         self.rpn_head    = RpnMultiHead(cfg, feature_channels)
-        self.rcnn_crop   = CropRoi  (cfg, cfg.rcnn_crop_size)
+        self.rcnn_crop   = RoiAlign  (cfg, cfg.rcnn_crop_size)
         self.rcnn_head   = RcnnHead (cfg, crop_channels)
-        self.mask_crop   = CropRoi  (cfg, cfg.mask_crop_size)
+        self.mask_crop   = RoiAlign  (cfg, cfg.mask_crop_size)
         self.mask_head   = MaskHead (cfg, crop_channels)
 
     def forward(self, images, truth_boxes=None, truth_labels=None, truth_instances=None):

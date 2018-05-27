@@ -7,7 +7,7 @@ from net.layer.rpn.rpn_head import RpnMultiHead
 from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes
 from net.layer.rcnn.rcnn_head import RcnnHead
 from net.layer.mask.mask_head import MaskHead
-from net.layer.roi_align.crop import CropRoi
+from net.layer.roi_align import RoiAlign
 
 from net.layer.nms import rpn_nms, rcnn_nms, mask_nms
 
@@ -98,7 +98,7 @@ class TestNms(unittest.TestCase):
         p5 = torch.randn(5, 256, 16, 16)
         fs = [p2, p3, p4, p5]
 
-        roi_align = CropRoi(self.cfg, self.cfg.rcnn_crop_size)
+        roi_align = RoiAlign(self.cfg, self.cfg.rcnn_crop_size)
 
         empty_proposal = torch.zeros((1, 7))
         crop = roi_align(fs, empty_proposal)
@@ -147,7 +147,7 @@ class TestNms(unittest.TestCase):
         p5 = torch.randn(5, 256, 16, 16)
         fs = [p2, p3, p4, p5]
 
-        roi_align = CropRoi(self.cfg, self.cfg.rcnn_crop_size)
+        roi_align = RoiAlign(self.cfg, self.cfg.rcnn_crop_size)
 
         empty_proposal = torch.zeros((1, 7))
         crop = roi_align(fs, empty_proposal)
