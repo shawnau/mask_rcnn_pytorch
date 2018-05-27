@@ -17,7 +17,7 @@ class ScienceDataset(Dataset):
             for 3 masks in a 4*4 input
         index: index of the image (unique)
     """
-    def __init__(self, cfg, transform=None, mode='train'):
+    def __init__(self, cfg, split, transform=None, mode='train'):
         super(ScienceDataset, self).__init__()
 
         self.cfg = cfg
@@ -25,7 +25,9 @@ class ScienceDataset(Dataset):
         self.mode = mode
 
         # read split
-        self.ids = [x.split('.')[0] for x in listdir(os.path.join(self.cfg.data_dir, 'images'))]
+        # self.ids = [x.split('.')[0] for x in listdir(os.path.join(self.cfg.data_dir, 'images'))]
+        with open(split) as f:
+            self.ids = [x.strip() for x in f.readlines()]
 
     def __getitem__(self, index):
         name = self.ids[index]

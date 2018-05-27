@@ -95,6 +95,16 @@ def train_augment(image, multi_mask, index):
     return input_image, boxes, labels, instances, index
 
 
+def valid_augment(image, multi_mask, meta, index):
+    WIDTH, HEIGHT = 256, 256
+
+    image, multi_mask = fix_crop_transform(image, multi_mask, -1, -1, WIDTH, HEIGHT)
+    input_image = torch.from_numpy(image.transpose((2,0,1))).float().div(255)
+    box, label, instance = multi_mask_to_annotation(multi_mask)
+
+    return input_image, box, label, instance, meta, index
+
+
 def make_collate(batch):
     """
     :param batch: a batch of data returned by DataSet
