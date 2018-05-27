@@ -3,6 +3,7 @@ from loader.transforms import *
 from torch.utils.data.sampler import *
 from loader.dsb2018.dataset import ScienceDataset
 
+
 def multi_mask_to_annotation(multi_mask):
     """
     :param multi_mask: a map records masks. e.g.
@@ -58,14 +59,14 @@ def multi_mask_to_annotation(multi_mask):
             labels.append(1)  # <todo> support multiclass
             instances.append(mask)
 
-    boxes     = np.array(boxes,np.float32)
-    labels    = np.array(labels,np.int64)
-    instances = np.array(instances,np.float32)
+    boxes     = np.array(boxes,  np.float32)
+    labels    = np.array(labels, np.int64)
+    instances = np.array(instances, np.float32)
 
     if len(boxes)==0:
-        boxes      = np.zeros((0,4),np.float32)
-        labels    = np.zeros((0,1),np.int64)
-        instances = np.zeros((0,H,W),np.float32)
+        boxes     = np.zeros((0, 4), np.float32)
+        labels    = np.zeros((0, ), np.int64)
+        instances = np.zeros((0, H, W), np.float32)
 
     return boxes, labels, instances
 

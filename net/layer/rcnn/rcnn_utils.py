@@ -94,7 +94,7 @@ def rcnn_reg_loss(labels, deltas, targets, deltas_sigma=1.0):
         return F.smooth_l1_loss(deltas * deltas_sigma2, targets * deltas_sigma2,
                                 size_average=False) / deltas_sigma2 / num_pos_proposals
     else:
-        return torch.FloatTensor(0.0, requires_grad=True).to(deltas.device)
+        return torch.tensor(0.0, requires_grad=True).to(deltas.device)
 
 
 def rcnn_cls_loss(logits, labels):

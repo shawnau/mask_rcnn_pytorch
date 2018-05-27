@@ -43,7 +43,7 @@ def mask_loss(logits, labels, instances):
     dim = logits_flat.size(2)
 
     # one hot encode
-    select = torch.zeros((batch_size, num_classes)).to(logits.device)
+    select = torch.zeros((batch_size, num_classes), dtype=torch.int64).to(logits.device)
     select.scatter_(1, labels.view(-1, 1), 1)
     select[:, 0] = 0
     select = select.view(batch_size, num_classes, 1).expand((batch_size, num_classes, dim)).contiguous().byte()

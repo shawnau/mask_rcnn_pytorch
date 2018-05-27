@@ -3,6 +3,15 @@ import torch.nn.functional as F
 import numpy as np
 
 
+def to_tensor(source, device):
+    if type(source) is np.ndarray:
+        return torch.from_numpy(source).to(device)
+    elif type(source) is torch.Tensor:
+        return source
+    else:
+        raise TypeError('unknown data type')
+
+
 # https://stackoverflow.com/questions/34968722/how-to-implement-the-softmax-function-in-python
 def np_softmax(x):
     """Compute softmax values for each sets of scores in x."""

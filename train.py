@@ -52,9 +52,9 @@ def run_train():
 
             print("iter: ", j, "%.4f, %.4f, %.4f, %.4f, %.4f"%(net.rpn_cls_loss.detach().cpu().numpy(),
                                                                net.rpn_reg_loss.detach().cpu().numpy(),
-                                                               net.rcnn_cls_loss.detach().cpu().numpy(),
-                                                               net.rcnn_reg_loss.detach().cpu().numpy(),
-                                                               net.mask_cls_loss.detach().cpu().numpy()) )
+                                                               net.rcnn_cls_loss.detach().cpu().numpy() if net.rcnn_cls_loss else 0.0,
+                                                               net.rcnn_reg_loss.detach().cpu().numpy() if net.rcnn_cls_loss else 0.0,
+                                                               net.mask_cls_loss.detach().cpu().numpy() if net.rcnn_cls_loss else 0.0) )
             if j%100 == 0:
                 torch.save(net.state_dict(), "%s.pth"%j)
 

@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import unittest
 
@@ -97,16 +98,21 @@ class TestROIAlign(unittest.TestCase):
         p4 = torch.randn(5, 256, 32, 32)
         p5 = torch.randn(5, 256, 16, 16)
         self.fs = [p2, p3, p4, p5]
-        # [i, x0, y0, x1, y1, score, label]
-        self.proposals = torch.FloatTensor([[0, 1, 1, 5, 5, 0.6, 1],
-                                            [1, 2, 2, 6, 6, 0.2, 0],
-                                            [2, 3, 3, 7, 7, 0.5, 1],])
         print('=' * 10 + 'Test ROI Align' + '=' * 10)
         self.net = CropRoi(self.cfg, self.cfg.rcnn_crop_size)
 
     def test_forward(self):
-        crops = self.net(self.fs, self.proposals)
+        # [i, x0, y0, x1, y1, score, label]
+        proposals = torch.FloatTensor([[0, 1, 1, 5, 5, 0.6, 1],
+                                       [1, 2, 2, 6, 6, 0.2, 0],
+                                       [2, 3, 3, 7, 7, 0.5, 1],])
+        crops = self.net(self.fs, proposals)
         print("cropped features: ", crops.size())
+
+    def test_empty(self):
+        empty = torch.zeros((1, 7))
+        crops = self.net(self.fs, empty)
+        print("empty features: ", crops.size())
 
 
 class TestRCNNHead(unittest.TestCase):
@@ -143,6 +149,7 @@ if __name__ == '__main__':
         TestRPNHead("test_forward"),
         TestRPNHead("test_rpn_anchors"),
         TestROIAlign("test_forward"),
+        TestROIAlign("test_empty"),
         TestRCNNHead("test_forward"),
         TestMaskHead("test_forward")
     ])

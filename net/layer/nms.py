@@ -6,15 +6,19 @@ from net.layer.mask.mask_utils import instance_to_binary
 from net.layer.rpn.rpn_utils import rpn_decode
 from net.layer.rcnn.rcnn_utils import rcnn_decode
 from net.utils.box_utils import clip_boxes, filter_boxes
-from net.utils.func_utils import np_softmax, np_sigmoid
-from net.lib.gpu_nms.gpu_nms import gpu_nms
-#from net.lib.nms.cython_nms import cython_nms
+from net.utils.func_utils import np_softmax, np_sigmoid, to_tensor
+
+if torch.cuda.is_available():
+    from net.lib.gpu_nms.gpu_nms import gpu_nms as nms_func
+else:
+    from net.lib.nms.cython_nms import cython_nms as nms_func
+
 from net.lib.box_overlap.cython_box_overlap import cython_box_overlap
 
 
 def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn_proposals=None):
     """
-    used for rpn and rcnn nms
+    used for rpn and rcnn nms_func
     This function:
     1. Do non-maximum suppression on given window and logistic score
     2. filter small ret_proposals, crop border
@@ -25,9 +29,9 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
     :param images: a batch of input images
     :param anchor_boxes: all anchor boxes in a batch, list of coords, e.g.
                [[x0, y0, x1, y1], ...], a total of 16*16*3 + 32*32*3 + 64*64*3 + 128*128*3
-    :param logits: (B, N, 2) NOT nomalized
+    :param logits_np: (B, N, 2) NOT nomalized
                [[0.7, 0.5], ...]
-    :param deltas: (B, N, 2, 4)
+    :param deltas_np: (B, N, 2, 4)
                [[[t1, t2, t3, t4], [t1, t2, t3, t4]], ...]
     :return: all proposals in a batch. e.g.
         [i, x0, y0, x1, y1, score, label]
@@ -52,8 +56,8 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
         raise ValueError('rpn_nms(): invalid mode = %s?' % mode)
 
     num_classes = 2 if head == 'rpn' else cfg.num_classes
-    logits = logits.detach().cpu().numpy()
-    deltas = deltas.detach().cpu().numpy() if head == 'rpn' else deltas.detach().cpu().numpy().reshape(-1, num_classes, 4)
+    logits_np = logits.detach().cpu().numpy()
+    deltas_np = deltas.detach().cpu().numpy() if head == 'rpn' else deltas.detach().cpu().numpy().reshape(-1, num_classes, 4)
     batch_size, _, height, width = images.size()
 
     # non-max suppression
@@ -63,18 +67,16 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
         if head == 'rpn':
             assert anchor_boxes is not None
             raw_box = anchor_boxes
-            prob_distrib = np_softmax(logits[img_idx])  # (N, 2)
-            delta_distrib = deltas[img_idx]  # (N, 2, 4)
+            prob_distrib = np_softmax(logits_np[img_idx])  # (N, 2)
+            delta_distrib = deltas_np[img_idx]  # (N, 2, 4)
         else:  # rcnn
-            assert  rpn_proposals is not None
-            if type(rpn_proposals) is torch.Tensor:
-                rpn_proposals = rpn_proposals.detach().cpu().numpy()
-            select = np.where(rpn_proposals[:, 0] == img_idx)[0]
+            rpn_proposals_np = rpn_proposals.detach().cpu().numpy()
+            select = np.where(rpn_proposals_np[:, 0] == img_idx)[0]
             if len(select) == 0:
-                return torch.from_numpy(np.vstack([np.empty((0, 7), np.float32)])).to(cfg.device)
-            raw_box = rpn_proposals[select, 1:5]
-            prob_distrib = np_softmax(logits[select])  # <todo>why not use np_sigmoid?
-            delta_distrib = deltas[select]
+                return torch.zeros((1, 7)).to(cfg.device)
+            raw_box = rpn_proposals_np[select, 1:5]
+            prob_distrib = np_softmax(logits_np[select])  # <todo>why not use np_sigmoid?
+            delta_distrib = deltas_np[select]
 
         # skip background
         for cls_idx in range(1, num_classes):  # 0 for background, 1 for foreground
@@ -91,7 +93,7 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
                 if len(keep) > 0:
                     box = box[keep]
                     prob = prob[keep]
-                    keep = gpu_nms(np.hstack((box, prob)), nms_overlap_threshold)
+                    keep = nms_func(np.hstack((box, prob)), nms_overlap_threshold)
 
                     proposal = np.zeros((len(keep), 7), np.float32)
                     proposal[:, 0] = img_idx
@@ -103,7 +105,8 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
         pic_proposals = np.vstack(pic_proposals)
         ret_proposals.append(pic_proposals)
 
-    ret_proposals = torch.from_numpy(np.vstack(ret_proposals)).to(cfg.device)
+    ret_proposals = np.vstack(ret_proposals)
+    ret_proposals = to_tensor(ret_proposals, cfg.device)
     return ret_proposals
 
 
@@ -134,8 +137,8 @@ def mask_nms(cfg, images, proposals, mask_logits):
     mask_threshold      = cfg.mask_test_mask_threshold
     mask_min_area       = cfg.mask_test_mask_min_area
 
-    proposals   = proposals.cpu().data.numpy()
-    mask_logits = mask_logits.cpu().data.numpy()
+    proposals   = proposals.detach().cpu().numpy()
+    mask_logits = mask_logits.detach().cpu().numpy()
     mask_probs  = np_sigmoid(mask_logits)
 
     b_multi_masks = []
@@ -143,13 +146,13 @@ def mask_nms(cfg, images, proposals, mask_logits):
     b_mask_instances = []
     batch_size, C, H, W = images.size()
     for b in range(batch_size):
-        multi_masks = np.zeros((H, W), np.float32)  # multi masks for a image
-        mask_proposals = []  # proposals for a image
-        mask_instances = []  # instances for a image
+        multi_masks = np.zeros((H, W), np.float32)
+        mask_proposals = []
+        mask_instances = []
         num_keeps = 0
 
         index = np.where((proposals[:, 0] == b) & (proposals[:, 5] > pre_score_threshold))[0]
-        if len(index) != 0:
+        if len(index) > 0:
             instances = []    # all instances
             boxes = []        # all boxes
             for i in index:
@@ -166,7 +169,7 @@ def mask_nms(cfg, images, proposals, mask_logits):
                 instances.append(mask)
                 boxes.append([x0, y0, x1, y1])
 
-            # compute box overlap, do nms
+            # compute box overlap, do nms_func
             L = len(index)
             binary = [instance_to_binary(m, mask_threshold, mask_min_area) for m in instances]
             boxes = np.array(boxes, np.float32)
@@ -211,11 +214,11 @@ def mask_nms(cfg, images, proposals, mask_logits):
                 multi_masks[np.where(binary[k])] = i + 1
                 mask_instances.append(instances[k].reshape(1, H, W))
 
-                t = index[k]  # t is the index of box before nms
+                t = index[k]  # t is the index of box before nms_func
                 b, x0, y0, x1, y1, score, label = proposals[t]
                 mask_proposals.append(np.array([b, x0, y0, x1, y1, score, label], np.float32))
 
-        if num_keeps==0:
+        if num_keeps == 0 or len(index) == 0:
             mask_proposals = np.zeros((0,7  ),np.float32)
             mask_instances = np.zeros((0,H,W),np.float32)
         else:
@@ -226,5 +229,6 @@ def mask_nms(cfg, images, proposals, mask_logits):
         b_mask_instances.append(mask_instances)
         b_multi_masks.append(multi_masks)
 
-    b_mask_proposals = torch.from_numpy(np.vstack(b_mask_proposals)).to(cfg.device)
+    b_mask_proposals = np.vstack(b_mask_proposals)
+    b_mask_proposals = to_tensor(b_mask_proposals, cfg.device)
     return b_multi_masks, b_mask_instances, b_mask_proposals

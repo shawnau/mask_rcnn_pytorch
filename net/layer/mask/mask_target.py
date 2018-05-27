@@ -1,6 +1,7 @@
 import copy
 import torch
 import numpy as np
+from net.utils.func_utils import to_tensor
 from net.utils.box_utils import is_small_box, resize_instance
 from net.lib.box_overlap.cython_box_overlap import cython_box_overlap
 from net.layer.rcnn.rcnn_target import add_truth_box_to_proposal
@@ -32,9 +33,6 @@ def make_one_mask_target(cfg, image, proposals, truth_box, truth_label, truth_in
     sampled_label    = torch.LongTensor (0, 1).to(cfg.device)
     sampled_instance = torch.FloatTensor(0, 1, 1).to(cfg.device)
 
-    if len(truth_box) == 0 or len(proposals) == 0:
-        return sampled_proposal, sampled_label, sampled_instance
-
     # filter invalid proposals like small proposals
     _, height, width = image.size()
     num_proposal = len(proposals)
@@ -44,54 +42,51 @@ def make_one_mask_target(cfg, image, proposals, truth_box, truth_label, truth_in
         box = proposals[i, 1:5]
         if not(is_small_box(box, min_size=cfg.mask_train_min_size)):  # is_small_box_at_boundary
             valid.append(i)
-
-    if len(valid) == 0:
-        return sampled_proposal, sampled_label, sampled_instance
-
     proposals = proposals[valid]
-    # assign bbox to proposals by overlap threshold
+
     num_proposal = len(proposals)
-    box = proposals[:, 1:5]
-    # for each bbox, the index of gt which has max overlap with it
-    overlap = cython_box_overlap(box, truth_box)
-    argmax_overlap = np.argmax(overlap, 1)
-    max_overlap = overlap[np.arange(num_proposal), argmax_overlap]
+    if len(truth_box) > 0 and num_proposal > 0:
+        # assign bbox to proposals by overlap threshold
+        box = proposals[:, 1:5]
+        # for each bbox, the index of gt which has max overlap with it
+        overlap = cython_box_overlap(box, truth_box)
+        argmax_overlap = np.argmax(overlap, 1)
+        max_overlap = overlap[np.arange(num_proposal), argmax_overlap]
 
-    fg_index = np.where(max_overlap >= cfg.mask_train_fg_thresh_low)[0]
+        fg_index = np.where(max_overlap >= cfg.mask_train_fg_thresh_low)[0]
 
-    if len(fg_index) == 0:
-        return sampled_proposal, sampled_label, sampled_instance
+        if len(fg_index) > 0:
+            fg_length = len(fg_index)
+            num_fg = cfg.mask_train_batch_size
+            fg_index = fg_index[
+                np.random.choice(fg_length, size=num_fg, replace=fg_length < num_fg)
+            ]
 
-    fg_length = len(fg_index)
-    num_fg = cfg.mask_train_batch_size
-    fg_index = fg_index[
-        np.random.choice(fg_length, size=num_fg, replace=fg_length < num_fg)
-    ]
+            sampled_proposal = proposals[fg_index]
+            sampled_assign   = argmax_overlap[fg_index]     # assign a gt to each bbox
+            sampled_label    = truth_label[sampled_assign]  # assign gt's_train label to each bbox
+            sampled_instance = []
+            for i in range(len(fg_index)):
+                instance = truth_instance[sampled_assign[i]]  # for each positive bbox, find instance it belongs to
+                box  = sampled_proposal[i, 1:5]
+                crop = resize_instance(instance, box, cfg.mask_size)  # crop the instance by box
+                sampled_instance.append(crop[np.newaxis, :, :])
 
-    sampled_proposal = proposals[fg_index]
-    sampled_assign   = argmax_overlap[fg_index]     # assign a gt to each bbox
-    sampled_label    = truth_label[sampled_assign]  # assign gt's_train label to each bbox
-    sampled_instance = []
-    for i in range(len(fg_index)):
-        instance = truth_instance[sampled_assign[i]]  # for each positive bbox, find instance it belongs to
-        box  = sampled_proposal[i, 1:5]
-        crop = resize_instance(instance, box, cfg.mask_size)  # crop the instance by box
-        sampled_instance.append(crop[np.newaxis, :, :])
+        # save
+        sampled_instance = np.vstack(sampled_instance)
 
-    # save
-    sampled_instance = np.vstack(sampled_instance)
-    sampled_proposal = sampled_proposal if type(sampled_proposal) is torch.Tensor else torch.from_numpy(sampled_proposal).to(cfg.device)
-    sampled_label    = sampled_label if type(sampled_label) is torch.Tensor else torch.from_numpy(sampled_label   ).to(cfg.device)
-    sampled_instance = sampled_instance if type(sampled_instance) is torch.Tensor else torch.from_numpy(sampled_instance).to(cfg.device)
+        sampled_proposal = to_tensor(sampled_proposal, cfg.device)
+        sampled_label    = to_tensor(sampled_label, cfg.device)
+        sampled_instance = to_tensor(sampled_instance, cfg.device)
 
     return sampled_proposal, sampled_label, sampled_instance
 
 
-def make_mask_target(cfg, images, proposals, truth_boxes, truth_labels, truth_instances):
+def make_mask_target(cfg, images, rcnn_proposals, truth_boxes, truth_labels, truth_instances):
     """
     :param:
         images:
-        proposals:
+        rcnn_proposals:
         truth_boxes:
         truth_labels:
         truth_instances:
@@ -101,12 +96,8 @@ def make_mask_target(cfg, images, proposals, truth_boxes, truth_labels, truth_in
         sampled_assigns: which gt the bbox is assigned to (seems not used)
         sampled_instances: cropped/resized instance mask into mask output (28*28)
     """
-    proposals = proposals.detach().cpu().numpy() if type(proposals) is torch.Tensor else proposals
-    truth_boxes = truth_boxes.detach().cpu().numpy() if type(truth_boxes) is torch.Tensor else truth_boxes
-    truth_labels = truth_labels.detach().cpu().numpy() if type(truth_labels) is torch.Tensor else truth_labels
-    truth_instances = truth_instances.detach().cpu().numpy() if type(truth_instances) is torch.Tensor else truth_instances
-    
-    #<todo> take care of don't care ground truth. Here, we only ignore them  ---
+    rcnn_proposals_np = rcnn_proposals.detach().cpu().numpy()
+
     truth_boxes     = copy.deepcopy(truth_boxes)
     truth_labels    = copy.deepcopy(truth_labels)
     truth_instances = copy.deepcopy(truth_instances)
@@ -121,7 +112,7 @@ def make_mask_target(cfg, images, proposals, truth_boxes, truth_labels, truth_in
     sampled_labels     = []
     sampled_instances  = []
 
-    batch_size = len(truth_boxes)
+    batch_size = len(images)
     for b in range(batch_size):
         image          = images[b]
         truth_box      = truth_boxes[b]
@@ -129,10 +120,10 @@ def make_mask_target(cfg, images, proposals, truth_boxes, truth_labels, truth_in
         truth_instance = truth_instances[b]
 
         if len(truth_box) != 0:
-            if len(proposals)==0:
-                proposal = np.zeros((0,7),np.float32)
+            if len(rcnn_proposals_np) == 0:
+                proposal = np.zeros((0, 7), np.float32)
             else:
-                proposal = proposals[proposals[:,0]==b]
+                proposal = rcnn_proposals_np[rcnn_proposals_np[:, 0] == b]
 
             proposal = add_truth_box_to_proposal(proposal, b, truth_box, truth_label)
 

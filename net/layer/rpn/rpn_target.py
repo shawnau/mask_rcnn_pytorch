@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from net.utils.func_utils import to_tensor
 from net.lib.box_overlap.cython_box_overlap import cython_box_overlap
 from net.layer.rpn.rpn_utils import rpn_encode
 
@@ -8,22 +9,22 @@ def make_one_rpn_target(cfg, anchor_boxes, truth_boxes):
     """
     labeling windows for one image
     :param image: input image
-    :param anchor_boxes: list of bboxes e.g. [x0, y0, x1, y1]
-    :param truth_boxes: list of boxes, e.g. [x0, y0, x1, y1]
-    :param truth_labels: 1 for sure
+    :param anchor_boxes: [[x0, y0, x1, y1]]: (N, 4) ndarray of float32
+    :param truth_boxes:  [[x0, y0, x1, y1]]: (N, 4) ndarray of float32
+    :param truth_labels: [1, 1, 1, ...], (N, ) ndarray of int64
     :return:
-        label: 1 for pos, 0 for neg
-        label_assign: which truth box is assigned to the window
+        anchor_labels: 1 for pos, 0 for neg
+        anchor_assigns: which truth box is assigned to the anchor box
         label_weight: pos=1, neg \in (0, 1] by rareness, otherwise 0 (don't care)
-        target: bboxes' offsets
-        target_weight: same as label_weight
+        delta: bboxes' offsets
+        delta_weight: same as label_weight
     """
     num_anchor_boxes = len(anchor_boxes)
-    label = np.zeros((num_anchor_boxes,), np.float32)
-    label_assign = np.zeros((num_anchor_boxes,), np.int32)
-    label_weight = np.ones((num_anchor_boxes,), np.float32)  # <todo> why use 1 for init ?
-    target = np.zeros((num_anchor_boxes, 4), np.float32)
-    target_weight = np.zeros((num_anchor_boxes,), np.float32)
+    anchor_labels  = np.zeros((num_anchor_boxes,), np.int64)
+    anchor_assigns = np.zeros((num_anchor_boxes,), np.int64)
+    label_weight   = np.ones((num_anchor_boxes,), np.float32)  # <todo> why use 1 for init ?
+    delta          = np.zeros((num_anchor_boxes, 4), np.float32)
+    delta_weight   = np.zeros((num_anchor_boxes,), np.float32)
 
     num_truth_box = len(truth_boxes)
     if num_truth_box != 0:
@@ -31,15 +32,15 @@ def make_one_rpn_target(cfg, anchor_boxes, truth_boxes):
         overlap = cython_box_overlap(anchor_boxes, truth_boxes)
         argmax_overlap = np.argmax(overlap, 1)
         max_overlap = overlap[np.arange(num_anchor_boxes), argmax_overlap]
-        # label 1/0 for each anchor
+        # anchor_labels 1/0 for each anchor
         bg_index = max_overlap < cfg.rpn_train_bg_thresh_high
-        label[bg_index] = 0
+        anchor_labels[bg_index] = 0
         label_weight[bg_index] = 1
 
         fg_index = max_overlap >= cfg.rpn_train_fg_thresh_low
-        label[fg_index] = 1
+        anchor_labels[fg_index] = 1
         label_weight[fg_index] = 1
-        label_assign[...] = argmax_overlap
+        anchor_assigns[...] = argmax_overlap
 
         # for each truth, anchor_boxes with highest overlap, include multiple maxs
         # re-assign less overlapped gt to anchor_boxes
@@ -48,20 +49,20 @@ def make_one_rpn_target(cfg, anchor_boxes, truth_boxes):
         anchor_assignto_gt, gt_assignto_anchor = np.where(overlap == max_overlap)
 
         fg_index = anchor_assignto_gt
-        label[fg_index] = 1
+        anchor_labels[fg_index] = 1
         label_weight[fg_index] = 1
-        label_assign[fg_index] = gt_assignto_anchor
+        anchor_assigns[fg_index] = gt_assignto_anchor
 
         # regression
-        fg_index = np.where(label != 0)
+        fg_index = np.where(anchor_labels != 0)
         target_window = anchor_boxes[fg_index]
-        target_truth_box = truth_boxes[label_assign[fg_index]]
-        target[fg_index] = rpn_encode(target_window, target_truth_box)
-        target_weight[fg_index] = 1
+        target_truth_box = truth_boxes[anchor_assigns[fg_index]]
+        delta[fg_index] = rpn_encode(target_window, target_truth_box)
+        delta_weight[fg_index] = 1
 
         # weights for class balancing
-        fg_index = np.where((label_weight != 0) & (label != 0))[0]
-        bg_index = np.where((label_weight != 0) & (label == 0))[0]
+        fg_index = np.where((label_weight != 0) & (anchor_labels != 0))[0]
+        bg_index = np.where((label_weight != 0) & (anchor_labels == 0))[0]
 
         num_fg = len(fg_index)
         num_bg = len(bg_index)
@@ -69,15 +70,16 @@ def make_one_rpn_target(cfg, anchor_boxes, truth_boxes):
         label_weight[bg_index] = num_fg / num_bg
 
         # task balancing
-        target_weight[fg_index] = label_weight[fg_index]
+        delta_weight[fg_index] = label_weight[fg_index]
 
     # save
-    label = torch.from_numpy(label).to(cfg.device)
-    label_assign = torch.from_numpy(label_assign).to(cfg.device)
-    label_weight = torch.from_numpy(label_weight).to(cfg.device)
-    target = torch.from_numpy(target).to(cfg.device)
-    target_weight = torch.from_numpy(target_weight).to(cfg.device)
-    return label, label_assign, label_weight, target, target_weight
+    anchor_labels  = to_tensor(anchor_labels,  cfg.device)
+    anchor_assigns = to_tensor(anchor_assigns, cfg.device)
+    label_weight   = to_tensor(label_weight,   cfg.device)
+    delta          = to_tensor(delta,          cfg.device)
+    delta_weight   = to_tensor(delta_weight,   cfg.device)
+
+    return anchor_labels, anchor_assigns, label_weight, delta, delta_weight
 
 
 def make_rpn_target(cfg, anchor_boxes, truth_boxes_batch):
@@ -85,12 +87,15 @@ def make_rpn_target(cfg, anchor_boxes, truth_boxes_batch):
     append -> concat -> to tensor
     :param cfg:
     :param images:
-    :param anchor_boxes:
-    :param truth_boxes_batch:
+    :param anchor_boxes: list of ndarray [B*(N, 4)]
+    :param truth_boxes_batch: list of ndarray [B*(N, 4)]
     :return:
+        anchor_labels    (B, N) IntTensor
+        anchor_label_assigns
+        anchor_label_weights
+        anchor_targets
+        anchor_targets_weights
     """
-    truth_boxes_batch = truth_boxes_batch.detach().cpu().numpy() if type(truth_boxes_batch) is torch.Tensor else truth_boxes_batch
-    
     anchor_labels = []
     anchor_label_assigns = []
     anchor_label_weights = []

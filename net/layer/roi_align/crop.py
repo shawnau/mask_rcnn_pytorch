@@ -24,7 +24,7 @@ class CropRoi(nn.Module):
     def forward(self, fs, proposals):
         """
         :param fs: [p2, p3, p4, p5]
-        :param proposals: bbox filtered by nms
+        :param proposals: bbox filtered by nms_func
             [i, x0, y0, x1, y1, score, label]
         :return:
             cropped feature maps for each box
@@ -33,7 +33,7 @@ class CropRoi(nn.Module):
 
         # this is complicated. we need to decide for a given roi,
         # which of the p2,p3,p4,p5 layers to pool from
-        boxes = proposals.detach().data[:, 1:5]
+        boxes = proposals.detach()[:, 1:5]
         sizes = boxes[:, 2:]-boxes[:, :2]  # box sizes (w, h)
         sizes = torch.sqrt(sizes[:, 0]*sizes[:, 1])  # sqrt(wh)
         # compare box with 4 different base sizes
@@ -43,8 +43,7 @@ class CropRoi(nn.Module):
         # distances: 1,  3,  3,  7 (min_index=0, pool from fs[0]=p2)
         min_distances, min_index = distances.min(1)
 
-        rois = proposals.detach().data[:, 0:5]
-        rois = Variable(rois)
+        rois = proposals.detach()[:, 0:5]
         # pool from each layer in fs
         crops   = []
         indices = []

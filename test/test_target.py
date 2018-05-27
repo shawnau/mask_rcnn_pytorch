@@ -3,7 +3,11 @@ from torch.utils.data import DataLoader
 from loader.dsb2018.train_utils import *
 
 from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes, rpn_cls_loss, rpn_reg_loss
-from net.layer.target import make_rpn_target, make_mask_target, make_rcnn_target
+
+from net.layer.rpn.rpn_target import make_rpn_target
+from net.layer.rcnn.rcnn_target import make_rcnn_target
+from net.layer.mask.mask_target import make_mask_target
+
 from configuration import Configuration
 
 from net.layer.rcnn.rcnn_utils import rcnn_reg_loss, rcnn_cls_loss
@@ -54,7 +58,7 @@ class TestTarget(unittest.TestCase):
             truth_instances: [ndarray]: list of B (H, W) ndarray
             indices: [int]: list of int, indices of the image
             """
-
+            truth_boxes = [np.zeros((0, 4), np.float32) for _ in range(self.cfg.batch_size)]  # let's fake a box
             anchor_boxes = rpn_make_anchor_boxes(self.fs, self.cfg)
 
             anchor_labels, \
@@ -91,8 +95,8 @@ class TestTarget(unittest.TestCase):
 
     def test_rcnn(self):
         print('=' * 10, 'Test RCNN Target', '=' * 10)
-        # set up proposals a little different from truth
-        proposals = np.array(
+        # set up rpn_proposals a little different from truth
+        rpn_proposals = np.array(
             [[0., 52.,  161., 70.,  176., 0.6, 1.],
              [0., 148., 190., 176., 215., 0.7, 1.],
              [0., 130., 30.,  150., 60. , 0.5, 1.],
@@ -100,13 +104,15 @@ class TestTarget(unittest.TestCase):
              [1., 40.,  90.,  63.,  100., 0.8, 1.],
              [1., 170., 120., 189., 108., 0.9, 1.]]
         ).astype(np.float32) # overlap must use float32
-        proposals = torch.from_numpy(proposals).to(self.cfg.device)
+        rpn_proposals = torch.from_numpy(rpn_proposals).to(self.cfg.device)
 
         for inputs, truth_boxes, truth_labels, truth_instances, indices in self.train_loader:
+            #truth_boxes = [np.zeros((0, 4), np.float32)]  # let's fake an empty box
+            #rpn_proposals = torch.Tensor([])
             sampled_proposals, \
             sampled_labels, \
             sampled_assigns, \
-            sampled_targets = make_rcnn_target(self.cfg, proposals, truth_boxes, truth_labels)
+            sampled_targets = make_rcnn_target(self.cfg, inputs, rpn_proposals, truth_boxes, truth_labels)
 
             print('sampled_proposals: ', sampled_proposals.size())
             print('sampled_labels: ',    sampled_labels)
@@ -116,13 +122,11 @@ class TestTarget(unittest.TestCase):
             # test loss
             rcnn_logits = torch.randn(self.cfg.rcnn_train_batch_size, 2)
             rcnn_deltas = torch.randn(self.cfg.rcnn_train_batch_size, 8)
-            print(rcnn_logits.type(), rcnn_deltas.type(), sampled_labels.type())
 
             cls_loss = rcnn_cls_loss(rcnn_logits, sampled_labels)
             reg_loss = rcnn_reg_loss(sampled_labels, rcnn_deltas, sampled_targets)
             print('cls_loss: ', cls_loss)
             print('reg_loss: ', reg_loss)
-
 
     def test_mask(self):
         print('=' * 10, 'Test MASK Target', '=' * 10)
@@ -139,7 +143,7 @@ class TestTarget(unittest.TestCase):
         for inputs, truth_boxes, truth_labels, truth_instances, indices in self.train_loader:
             sampled_proposals, \
             sampled_labels, \
-            sampled_instances = make_mask_target(self.cfg, proposals, truth_boxes, truth_labels, truth_instances)
+            sampled_instances = make_mask_target(self.cfg, inputs, proposals, truth_boxes, truth_labels, truth_instances)
             print('sampled_proposals: ', sampled_proposals.size())
             print('sampled_labels: ', sampled_labels.size())
             print('sampled_instances: ', sampled_instances.size())

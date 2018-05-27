@@ -147,12 +147,18 @@ def rpn_reg_loss(labels, deltas, target_deltas, target_weights, delta_sigma=3.0)
     target_deltas = target_deltas.view(batch_num_anchors, 4)
     target_weights = target_weights.view(batch_num_anchors, 1)
     # calc positive samples only
-    index = (labels != 0).nonzero()[:, 0]
-    deltas = deltas[index]
-    target_deltas = target_deltas[index]
-    target_weights = target_weights[index].expand((-1, 4)).contiguous()
+    if len((labels != 0).nonzero()) > 0:
+        index = (labels != 0).nonzero()[:, 0]
+        deltas = deltas[index]
+        target_deltas = target_deltas[index]
+        target_weights = target_weights[index].expand((-1, 4)).contiguous()
 
-    select = labels[index].view(-1, 1).expand((-1, 4)).contiguous().view(-1, 1, 4)
-    deltas = deltas.gather(1, select).view(-1, 4)
+        select = labels[index].view(-1, 1).expand((-1, 4)).contiguous().view(-1, 1, 4)
+        deltas = deltas.gather(1, select).view(-1, 4)
+    else:  # all empty!
+        index = (labels != 0).nonzero()
+        deltas = deltas[index]
+        target_deltas = target_deltas[index]
+        target_weights = target_weights[index]
 
     return weighted_smooth_l1(deltas, target_deltas, target_weights, delta_sigma)

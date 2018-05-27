@@ -55,16 +55,16 @@ class MaskRcnnNet(nn.Module):
             self.rpn_targets_weights = \
                 make_rpn_target(self.cfg, self.anchor_boxes, truth_boxes)
 
-            self.sampled_rcnn_proposals, \
-            self.sampled_rcnn_labels, \
-            self.sampled_rcnn_assigns, \
-            self.sampled_rcnn_targets = \
-                make_rcnn_target(self.cfg, self.rpn_proposals, truth_boxes, truth_labels)
+            if len(self.rpn_proposals) > 0:
+                self.sampled_rcnn_proposals, \
+                self.sampled_rcnn_labels, \
+                self.sampled_rcnn_assigns, \
+                self.sampled_rcnn_targets = \
+                    make_rcnn_target(self.cfg, images, self.rpn_proposals, truth_boxes, truth_labels)
 
-            self.rpn_proposals = self.sampled_rcnn_proposals  # use sampled proposals for training
+                self.rpn_proposals = self.sampled_rcnn_proposals  # use sampled proposals for training
 
         # rcnn proposals ------------------------------------------------
-        self.rcnn_proposals = self.rpn_proposals # for eval only when no porposals
         if len(self.rpn_proposals) > 0:
             rcnn_crops = self.rcnn_crop(features, self.rpn_proposals)
             self.rcnn_logits, self.rcnn_deltas = self.rcnn_head(rcnn_crops)
@@ -72,9 +72,11 @@ class MaskRcnnNet(nn.Module):
                                            self.rpn_proposals,
                                            self.rcnn_logits,
                                            self.rcnn_deltas)
+        else:
+            self.rcnn_proposals = self.rpn_proposals  # for eval only when no rpn proposals
 
         # make targets for mask head ------------------------------------
-        if self.mode in ['train', 'valid']:
+        if self.mode in ['train', 'valid'] and len(self.rcnn_proposals) > 0:
             self.sampled_rcnn_proposals, \
             self.sampled_mask_labels, \
             self.sampled_mask_instances,   = \
@@ -94,7 +96,8 @@ class MaskRcnnNet(nn.Module):
         if len(self.rcnn_proposals) > 0:
             mask_crops = self.mask_crop(features, self.detections)
             self.mask_logits = self.mask_head(mask_crops)
-            self.masks, self.mask_instances, self.mask_proposals = mask_nms(self.cfg, images, self.rcnn_proposals, self.mask_logits)
+            self.masks, self.mask_instances, self.mask_proposals = \
+                mask_nms(self.cfg, images, self.rcnn_proposals, self.mask_logits)
             self.detections = self.mask_proposals
 
     def loss(self):
@@ -106,23 +109,26 @@ class MaskRcnnNet(nn.Module):
                                          self.rpn_deltas_flat,
                                          self.rpn_targets,
                                          self.rpn_targets_weights)
+        if len(self.rcnn_proposals) > 0:
+            self.rcnn_cls_loss = rcnn_cls_loss(self.rcnn_logits,
+                                               self.sampled_rcnn_labels)
 
-        self.rcnn_cls_loss = rcnn_cls_loss(self.rcnn_logits,
-                                           self.sampled_rcnn_labels)
+            self.rcnn_reg_loss = rcnn_reg_loss(self.sampled_rcnn_labels,
+                                               self.rcnn_deltas,
+                                               self.sampled_rcnn_targets)
 
-        self.rcnn_reg_loss = rcnn_reg_loss(self.sampled_rcnn_labels,
-                                           self.rcnn_deltas,
-                                           self.sampled_rcnn_targets)
+            self.mask_cls_loss  = mask_loss(self.mask_logits,
+                                            self.sampled_mask_labels,
+                                            self.sampled_mask_instances)
 
-        self.mask_cls_loss  = mask_loss(self.mask_logits,
-                                        self.sampled_mask_labels,
-                                        self.sampled_mask_instances)
-
-        self.total_loss = self.rpn_cls_loss + \
-                          self.rpn_reg_loss + \
-                          self.rcnn_cls_loss + \
-                          self.rcnn_reg_loss + \
-                          self.mask_cls_loss
+            self.total_loss = self.rpn_cls_loss + self.rpn_reg_loss + \
+                              self.rcnn_cls_loss + self.rcnn_reg_loss + \
+                              self.mask_cls_loss
+        else:
+            self.rcnn_cls_loss = None
+            self.rcnn_reg_loss = None
+            self.mask_cls_loss = None
+            self.total_loss = self.rpn_cls_loss + self.rpn_reg_loss
 
         return self.total_loss
 
