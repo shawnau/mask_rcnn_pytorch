@@ -1,6 +1,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class MaskHead(nn.Module):
 
     def __init__(self, cfg, in_channels):

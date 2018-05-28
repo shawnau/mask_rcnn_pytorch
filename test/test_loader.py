@@ -1,5 +1,4 @@
-import sys
-sys.path.append('../')
+import os
 import unittest
 from torch.utils.data import DataLoader
 from loader.dsb2018.train_utils import *
@@ -9,15 +8,16 @@ from visualize_utils.draw import image_show, draw_boxes, instances_to_contour_ov
 class Configuration:
     def __init__(self):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.data_dir = 'test_data/'
-        self.batch_size = 10
+        self.data_dir = os.path.join(os.getcwd(), 'data')
+        self.batch_size = 1
 
 
 class TestDataLoader(unittest.TestCase):
     def setUp(self):
         self.cfg = Configuration()
         # loader
-        train_dataset = ScienceDataset(self.cfg, 'test/data/valid43', mode='train', transform=train_augment)
+        split_file = os.path.join(os.getcwd(), 'data', 'valid43')
+        train_dataset = ScienceDataset(self.cfg, split_file, mode='train', transform=train_augment)
         self.train_loader = DataLoader(
             train_dataset,
             sampler=RandomSampler(train_dataset),
@@ -47,7 +47,7 @@ class TestDataLoader(unittest.TestCase):
             image = inputs.transpose((1, 2, 0))
             image = np.array(image, dtype=np.uint8).copy() # make contiguous
             # draw boxes and masks
-            image = draw_boxes(image, truth_boxes, color=(0, 0, 255))
+            draw_boxes(image, truth_boxes, color=(0, 0, 255))
             image = instances_to_contour_overlay(truth_instances, image, color=[0, 255, 0])
 
             image_show('%s'%index, image)

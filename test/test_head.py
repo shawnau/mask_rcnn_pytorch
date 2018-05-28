@@ -1,32 +1,14 @@
 import torch
 import unittest
 
+from configuration import Configuration
+
 from net.layer.backbone.SE_ResNeXt_FPN import SEResNeXtFPN
 from net.layer.rpn.rpn_head import RpnMultiHead
 from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes
 from net.layer.roi_align import RoiAlign
 from net.layer.rcnn.rcnn_head import RcnnHead
 from net.layer.mask.mask_head import MaskHead
-
-
-class Configuration:
-    def __init__(self):
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.data_dir = 'test_data/'
-        # data parameters
-        self.num_classes = 2
-        # rpn parameters
-        self.rpn_base_sizes = [8, 16, 32, 64]
-        self.rpn_scales = [2, 4, 8, 16]
-        aspect = lambda s, x: (s * 1 / x ** 0.5, s * x ** 0.5)
-        self.rpn_base_apsect_ratios = [
-            [(1, 1), aspect(2 ** 0.5, 2), aspect(2 ** 0.5, 0.5), ],
-            [(1, 1), aspect(2 ** 0.5, 2), aspect(2 ** 0.5, 0.5), ],
-            [(1, 1), aspect(2 ** 0.5, 2), aspect(2 ** 0.5, 0.5), ],
-            [(1, 1), aspect(2 ** 0.5, 2), aspect(2 ** 0.5, 0.5), ],
-        ]
-        # rcnn parameters
-        self.rcnn_crop_size = 14
 
 
 class TestBackbone(unittest.TestCase):
@@ -80,12 +62,24 @@ class TestRPNHead(unittest.TestCase):
 
     def test_forward(self):
         logits_flat, deltas_flat = self.net(self.fs)
+
+        batch_size, num_achor, num_classes = logits_flat.size()
         print("logits_flat: ", logits_flat.size())
+        self.assertEqual(batch_size, 5)
+        self.assertEqual(num_achor, (16 * 16 + 32 * 32 + 64 * 64 + 128 * 128) * 3)
+        self.assertEqual(num_classes, 2)
+
+        batch_size, num_achor, num_classes, num_delta = deltas_flat.size()
         print("deltas_flat: ", deltas_flat.size())
+        self.assertEqual(batch_size, 5)
+        self.assertEqual(num_achor, (16 * 16 + 32 * 32 + 64 * 64 + 128 * 128) * 3)
+        self.assertEqual(num_classes, 2)
+        self.assertEqual(num_delta, 4)
 
     def test_rpn_anchors(self):
         rpn_anchor_boxes = rpn_make_anchor_boxes(self.fs, self.cfg)
         print("rpn_anchor_boxes: ", len(rpn_anchor_boxes))
+        self.assertEqual(len(rpn_anchor_boxes), (16 * 16 + 32 * 32 + 64 * 64 + 128 * 128) * 3)
 
 
 class TestROIAlign(unittest.TestCase):
@@ -106,12 +100,17 @@ class TestROIAlign(unittest.TestCase):
                                        [1, 2, 2, 6, 6, 0.2, 0],
                                        [2, 3, 3, 7, 7, 0.5, 1],])
         crops = self.net(self.fs, proposals)
+        batch_size, in_channel, crop_width, crop_height = crops.size()
         print("cropped features: ", crops.size())
+        self.assertEqual(batch_size, len(proposals))
+        self.assertEqual(in_channel, 256)
+        self.assertEqual(crop_width, self.cfg.rcnn_crop_size)
+        self.assertEqual(crop_height, self.cfg.rcnn_crop_size)
 
     def test_empty(self):
         empty = torch.zeros((1, 7))
         crops = self.net(self.fs, empty)
-        print("empty features: ", crops.size())
+        print("Cropped zero proposals: ", crops.size())
 
 
 class TestRCNNHead(unittest.TestCase):
@@ -124,9 +123,15 @@ class TestRCNNHead(unittest.TestCase):
     def test_forward(self):
 
         logits, deltas = self.net(self.crop)
-
+        batch_size, num_classes = logits.size()
         print("logits: ", logits.size())
+        self.assertEqual(batch_size, 5)
+        self.assertEqual(num_classes, self.cfg.num_classes)
+
+        batch_size, num_deltas = deltas.size()
         print("deltas: ", deltas.size())
+        self.assertEqual(batch_size, 5)
+        self.assertEqual(num_deltas, self.cfg.num_classes * 4)
 
 
 class TestMaskHead(unittest.TestCase):
@@ -138,7 +143,12 @@ class TestMaskHead(unittest.TestCase):
 
     def test_forward(self):
         logits = self.net(self.crop)
+        batch_size, num_classes, mask_width, mask_height = logits.size()
         print("logits: ", logits.size())
+        self.assertEqual(batch_size, 5)
+        self.assertEqual(num_classes, self.cfg.num_classes)
+        self.assertEqual(mask_width, self.cfg.mask_size)
+        self.assertEqual(mask_height, self.cfg.mask_size)
 
 
 if __name__ == '__main__':

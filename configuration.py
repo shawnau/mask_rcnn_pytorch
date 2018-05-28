@@ -1,3 +1,4 @@
+import os
 import torch
 
 
@@ -6,7 +7,7 @@ class Configuration(object):
         super(Configuration, self).__init__()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.version = 'SE-FPN-ResNeXt50'
-        self.data_dir = 'test/data/'
+        self.data_dir = os.path.join('test', 'data')
         # net
         # include background class
         self.num_classes = 2
@@ -72,7 +73,7 @@ class Configuration(object):
         # optim -----------------------------------------------------------------
         self.lr = 0.01
         self.iter_accum = 1  # learning rate = lr/iter_accum
-        self.batch_size = 1
+        self.batch_size = 2
         self.num_iters = 20000
         self.iter_smooth = 1  # calculate smoothed loss over each 20 iter
         self.iter_valid = 10

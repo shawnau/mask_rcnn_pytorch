@@ -70,7 +70,7 @@ def run_train():
                         pin_memory=True,
                         collate_fn=make_collate)
 
-    valid_dataset = ScienceDataset(cfg, 'test/data/valid43', mode='train', transform=valid_augment)
+    valid_dataset = ScienceDataset(cfg, 'test/data/test1', mode='train', transform=valid_augment)
     valid_loader  = DataLoader(
                         valid_dataset,
                         sampler=SequentialSampler(valid_dataset),
@@ -154,7 +154,7 @@ def run_train():
             # accumulated update
             loss.backward()
             if j % cfg.iter_accum == 0:
-                torch.nn.utils.clip_grad_norm(net.parameters(), 1) # gradient clip
+                torch.nn.utils.clip_grad_norm_(net.parameters(), 1) # gradient clip
                 optimizer.step()
                 optimizer.zero_grad()
 
