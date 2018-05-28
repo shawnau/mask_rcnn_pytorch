@@ -64,7 +64,7 @@ class Configuration(object):
         self.mask_train_min_size       = 8
         self.mask_train_fg_thresh_low  = self.rpn_train_fg_thresh_low
 
-        self.mask_test_nms_pre_score_threshold = 0.1
+        self.mask_test_nms_pre_score_threshold = 0.5
         self.mask_test_nms_overlap_threshold = 0.2
         self.mask_test_mask_threshold  = 0.5
         self.mask_test_mask_min_area = 8

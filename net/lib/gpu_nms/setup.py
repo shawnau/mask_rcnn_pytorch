@@ -7,7 +7,6 @@ import os
 from os.path import join as pjoin
 import numpy as np
 
-
 #  /opt/anaconda3/bin/python3 setup.py build_ext --inplace
 #  http://martinsosic.com/development/2016/02/08/wrapping-c-library-as-python-module.html
 
@@ -19,13 +18,12 @@ except AttributeError:
 
 def find_in_path(name, path):
     "Find a file in a search path"
-    #adapted fom http://code.activestate.com/recipes/52224-find-a-file-given-a-search-path/
+    # adapted fom http://code.activestate.com/recipes/52224-find-a-file-given-a-search-path/
     for dir in path.split(os.pathsep):
         binpath = pjoin(dir, name)
         if os.path.exists(binpath):
             return os.path.abspath(binpath)
     return None
-
 
 
 def locate_cuda():
@@ -47,22 +45,22 @@ def locate_cuda():
         default_path = pjoin(os.sep, 'usr', 'local', 'cuda', 'bin')
         nvcc = find_in_path('nvcc', os.environ['PATH'] + os.pathsep + default_path)
         if nvcc is None:
-          return None;
+            return None
         home = os.path.dirname(os.path.dirname(nvcc))
 
-    cudaconfig = {'home':home, 'nvcc':nvcc,
+    cudaconfig = {'home': home, 'nvcc': nvcc,
                   'include': pjoin(home, 'include'),
                   'lib64': pjoin(home, 'lib64')}
     for k, v in cudaconfig.items():
         if not os.path.exists(v):
-            return None;
+            return None
 
     return cudaconfig
 
-CUDA = locate_cuda()
-print ("CUDA found:", CUDA)
 
-##----------------------------------------------------------------------------------------
+CUDA = locate_cuda()
+print("CUDA found:", CUDA)
+
 
 def customize_compiler_for_nvcc(self):
     """inject deep into distutils to customize how the dispatch
@@ -107,19 +105,12 @@ class custom_build_ext(build_ext):
         customize_compiler_for_nvcc(self.compiler)
         build_ext.build_extensions(self)
 
-##----------------------------------------------------------------------------------------
 
-# run the customize_compiler
-class custom_build_ext(build_ext):
-    def build_extensions(self):
-        customize_compiler_for_nvcc(self.compiler)
-        build_ext.build_extensions(self)
-
-#/usr/local/cuda-9.1/bin/nvcc -c -o gpu_nms_kernel.cu.o gpu_nms_kernel.cu -x cu -Xcompiler -fPIC -arch=sm_52
+# /usr/local/cuda-9.1/bin/nvcc -c -o gpu_nms_kernel.cu.o gpu_nms_kernel.cu -x cu -Xcompiler -fPIC -arch=sm_52
 ext_modules = [
     Extension(
         "gpu_nms",
-        sources = ["gpu_nms.pyx", "src/gpu_nms_kernel.cu"],
+        sources=["gpu_nms.pyx", "src/gpu_nms_kernel.cu"],
 
         library_dirs=[CUDA['lib64']],
         libraries=['cudart'],
@@ -129,16 +120,14 @@ ext_modules = [
         # we're only going to use certain compiler args with nvcc and not with gcc
         # the implementation of this trick is in customize_compiler() below
         extra_compile_args={
-				'gcc' : [],
-				'nvcc': ['-arch=sm_52', '--ptxas-options=-v', '-c', '--compiler-options', "'-fPIC'"],
-		},
-        include_dirs = [numpy_include, CUDA['include'], 'src']  
+            'gcc': [],
+            'nvcc': ['-arch=sm_52', '--ptxas-options=-v', '-c', '--compiler-options', "'-fPIC'"],
+        },
+        include_dirs=[numpy_include, CUDA['include'], 'src']
     ),
 ]
 
-
-setup(    name='mask_rcnn',
-          cmdclass={'build_ext': custom_build_ext},
-          ext_modules=ext_modules
-)
-
+setup(name='mask_rcnn',
+      cmdclass={'build_ext': custom_build_ext},
+      ext_modules=ext_modules
+      )

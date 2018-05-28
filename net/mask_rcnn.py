@@ -142,7 +142,10 @@ class MaskRcnnNet(nn.Module):
             raise NotImplementedError
 
     def load_pretrain(self, pretrain_file, skip=[]):
-        pretrain_state_dict = torch.load(pretrain_file)
+        if torch.cuda.is_available():
+            pretrain_state_dict = torch.load(pretrain_file)
+        else:
+            pretrain_state_dict = torch.load(pretrain_file, map_location='cpu')
         state_dict = self.state_dict()
 
         keys = list(state_dict.keys())

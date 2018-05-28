@@ -1,3 +1,5 @@
+import sys
+sys.path.append('../')
 import unittest
 from torch.utils.data import DataLoader
 from loader.dsb2018.train_utils import *
@@ -15,7 +17,7 @@ class TestDataLoader(unittest.TestCase):
     def setUp(self):
         self.cfg = Configuration()
         # loader
-        train_dataset = ScienceDataset(self.cfg, mode='train', transform=train_augment)
+        train_dataset = ScienceDataset(self.cfg, 'test/data/valid43', mode='train', transform=train_augment)
         self.train_loader = DataLoader(
             train_dataset,
             sampler=RandomSampler(train_dataset),
@@ -45,7 +47,7 @@ class TestDataLoader(unittest.TestCase):
             image = inputs.transpose((1, 2, 0))
             image = np.array(image, dtype=np.uint8).copy() # make contiguous
             # draw boxes and masks
-            draw_boxes(image, truth_boxes, color=(0, 0, 255))
+            image = draw_boxes(image, truth_boxes, color=(0, 0, 255))
             image = instances_to_contour_overlay(truth_instances, image, color=[0, 255, 0])
 
             image_show('%s'%index, image)

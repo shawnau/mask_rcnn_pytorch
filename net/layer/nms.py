@@ -11,7 +11,7 @@ from net.utils.func_utils import np_softmax, np_sigmoid, to_tensor
 if torch.cuda.is_available():
     from net.lib.gpu_nms.gpu_nms import gpu_nms as nms_func
 else:
-    from net.lib.nms.cython_nms import cython_nms as nms_func
+    from net.lib.cython_nms.cython_nms import cython_nms as nms_func
 
 from net.lib.box_overlap.cython_box_overlap import cython_box_overlap
 
@@ -169,7 +169,7 @@ def mask_nms(cfg, images, proposals, mask_logits):
                 instances.append(mask)
                 boxes.append([x0, y0, x1, y1])
 
-            # compute box overlap, do nms_func
+            # compute box overlap, do cython_nms
             L = len(index)
             binary = [instance_to_binary(m, mask_threshold, mask_min_area) for m in instances]
             boxes = np.array(boxes, np.float32)
