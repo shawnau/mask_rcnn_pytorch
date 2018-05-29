@@ -9,7 +9,7 @@ class RpnMultiHead(nn.Module):
     """
     def __init__(self, cfg, in_channels):
         """
-        :param cfg: <todo> better config file
+        :param cfg: net configuration
         :param in_channels:
         """
         super(RpnMultiHead, self).__init__()

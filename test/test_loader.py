@@ -1,23 +1,16 @@
-import os
 import unittest
+from configuration import Configuration
 from torch.utils.data import DataLoader
-from loader.dsb2018.train_utils import *
-from visualize_utils.draw import image_show, draw_boxes, instances_to_contour_overlay, instances_to_color_overlay
-
-
-class Configuration:
-    def __init__(self):
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-        self.data_dir = os.path.join(os.getcwd(), 'data')
-        self.batch_size = 1
+from loader.dsb2018.dataset import *
+from loader.sampler import *
+from net.utils.draw import image_show, draw_boxes, instances_to_contour_overlay
 
 
 class TestDataLoader(unittest.TestCase):
     def setUp(self):
         self.cfg = Configuration()
         # loader
-        split_file = os.path.join(os.getcwd(), 'data', 'valid43')
-        train_dataset = ScienceDataset(self.cfg, split_file, mode='train', transform=train_augment)
+        train_dataset = ScienceDataset(self.cfg, 'valid', mode='train', transform=train_augment)
         self.train_loader = DataLoader(
             train_dataset,
             sampler=RandomSampler(train_dataset),
@@ -25,7 +18,7 @@ class TestDataLoader(unittest.TestCase):
             drop_last=True,
             num_workers=4,
             pin_memory=True,
-            collate_fn=make_collate)
+            collate_fn=train_collate)
 
     def test_load(self):
         for inputs, truth_boxes, truth_labels, truth_instances, indices in self.train_loader:
@@ -51,12 +44,12 @@ class TestDataLoader(unittest.TestCase):
             image = instances_to_contour_overlay(truth_instances, image, color=[0, 255, 0])
 
             image_show('%s'%index, image)
-
-            k = cv2.waitKey(0)
-            if k == ord(' '):
-                continue
-            else:
-                break
+            break
+            # k = cv2.waitKey(0)
+            # if k == ord(' '):
+            #     continue
+            # else:
+            #     break
 
 
 if __name__ == '__main__':

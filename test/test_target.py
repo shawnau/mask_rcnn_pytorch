@@ -1,7 +1,7 @@
-import os
 import unittest
 from torch.utils.data import DataLoader
-from loader.dsb2018.train_utils import *
+from loader.dsb2018.dataset import *
+from loader.sampler import *
 
 from net.layer.rpn.rpn_utils import rpn_make_anchor_boxes, rpn_cls_loss, rpn_reg_loss
 
@@ -31,10 +31,9 @@ class TestTarget(unittest.TestCase):
     """
     def setUp(self):
         self.cfg = Configuration()
-        self.cfg.data_dir = os.path.join(os.getcwd(), 'data')
+        self.cfg.batch_size = 1
         # loader
-        split_file = os.path.join(os.getcwd(), 'data', 'test1')
-        train_dataset = ScienceDataset(self.cfg, split_file, mode='train', transform=train_augment)
+        train_dataset = ScienceDataset(self.cfg, 'test', mode='train', transform=train_augment)
         self.train_loader = DataLoader(
             train_dataset,
             sampler=RandomSampler(train_dataset),
@@ -42,7 +41,7 @@ class TestTarget(unittest.TestCase):
             drop_last=True,
             num_workers=4,
             pin_memory=True,
-            collate_fn=make_collate)
+            collate_fn=train_collate)
         # backbone features
         p2 = torch.randn(self.cfg.batch_size, 256, 128, 128)
         p3 = torch.randn(self.cfg.batch_size, 256, 64, 64)
@@ -60,6 +59,12 @@ class TestTarget(unittest.TestCase):
         ).astype(np.float32)  # overlap must use float32
         self.rpn_proposals = torch.from_numpy(rpn_proposals).to(self.cfg.device)
         self.rcnn_proposals = self.rpn_proposals
+
+        self.num_anchor = \
+            len(self.cfg.rpn_base_apsect_ratios[0]) * 128 * 128 + \
+            len(self.cfg.rpn_base_apsect_ratios[1]) * 64 * 64 + \
+            len(self.cfg.rpn_base_apsect_ratios[2]) * 32 * 32 + \
+            len(self.cfg.rpn_base_apsect_ratios[3]) * 16 * 16
 
     def test_rpn(self):
         print('=' * 10, 'Test RPN Target', '=' * 10)
@@ -81,13 +86,13 @@ class TestTarget(unittest.TestCase):
             anchor_targets_weights = make_rpn_target(self.cfg, anchor_boxes, truth_boxes)
 
             # test loss
-            rpn_logits_flat = torch.randn(self.cfg.batch_size, 65280, 2)
+            rpn_logits_flat = torch.randn(self.cfg.batch_size, self.num_anchor, 2)
             cls_loss = rpn_cls_loss(rpn_logits_flat,
                                     anchor_labels,
                                     anchor_label_weights)
             print('cls_loss: ', cls_loss)
 
-            rpn_deltas_flat = torch.randn(self.cfg.batch_size, 65280, 2, 4)
+            rpn_deltas_flat = torch.randn(self.cfg.batch_size, self.num_anchor, 2, 4)
             reg_loss = rpn_reg_loss(anchor_labels,
                                     rpn_deltas_flat,
                                     anchor_targets,

@@ -1,7 +1,7 @@
-import os
 import unittest
 from torch.utils.data import DataLoader
-from loader.dsb2018.train_utils import *
+from loader.dsb2018.dataset import *
+from loader.sampler import *
 
 from configuration import Configuration
 from net.layer.rpn.rpn_head import RpnMultiHead
@@ -29,10 +29,8 @@ class TestNms(unittest.TestCase):
     """
     def setUp(self):
         self.cfg = Configuration()
-        self.cfg.data_dir = os.path.join(os.getcwd(), 'data')
         # loader
-        split_file = os.path.join(os.getcwd(), 'data', 'test1')
-        train_dataset = ScienceDataset(self.cfg, split_file, mode='train', transform=train_augment)
+        train_dataset = ScienceDataset(self.cfg, 'test', mode='train', transform=train_augment)
         self.train_loader = DataLoader(
             train_dataset,
             sampler=RandomSampler(train_dataset),
@@ -40,7 +38,7 @@ class TestNms(unittest.TestCase):
             drop_last=True,
             num_workers=4,
             pin_memory=True,
-            collate_fn=make_collate)
+            collate_fn=train_collate)
         # backbone features
         p2 = torch.randn(5, 256, 128, 128)
         p3 = torch.randn(5, 256, 64, 64)

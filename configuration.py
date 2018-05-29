@@ -7,7 +7,7 @@ class Configuration(object):
         super(Configuration, self).__init__()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.version = 'SE-FPN-ResNeXt50'
-        self.data_dir = os.path.join('test', 'data')
+        self.data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'dsb2018')
         # net
         # include background class
         self.num_classes = 2
@@ -21,12 +21,18 @@ class Configuration(object):
         # the smaller the feature map is, the bigger the anchor box will be
         self.rpn_scales = [2, 4, 8, 16]
 
-        aspect = lambda s,x: (s*1/x**0.5,s*x**0.5)
+        aspect = lambda s, r: (s * 1 / r ** 0.5, s * r ** 0.5)
+        # self.rpn_base_apsect_ratios = [
+        #    [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
+        #    [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
+        #    [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
+        #    [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
+        # ]
         self.rpn_base_apsect_ratios = [
-           [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
-           [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
-           [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
-           [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
+            [(1, 1)],
+            [(1, 1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), ],
+            [(1, 1), aspect(2 ** 0.5,  1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), aspect(2 ** 0.25, 3), aspect(2 ** 0.25, 0.25), ],
+            [(1, 1), aspect(2 ** 0.5,  1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), ],
         ]
 
         self.rpn_train_bg_thresh_high = 0.5
@@ -73,8 +79,8 @@ class Configuration(object):
         # optim -----------------------------------------------------------------
         self.lr = 0.01
         self.iter_accum = 1  # learning rate = lr/iter_accum
-        self.batch_size = 2
-        self.num_iters = 20000
+        self.batch_size = 1
+        self.num_iters = 2000
         self.iter_smooth = 1  # calculate smoothed loss over each 20 iter
         self.iter_valid = 10
         self.iter_save = 100

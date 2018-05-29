@@ -60,26 +60,32 @@ class TestRPNHead(unittest.TestCase):
         print('=' * 10 + 'Test RPN Head' + '=' * 10)
         self.net = RpnMultiHead(self.cfg, 256)
 
+        self.num_anchor = \
+            len(self.cfg.rpn_base_apsect_ratios[0]) * 128 * 128 + \
+            len(self.cfg.rpn_base_apsect_ratios[1]) * 64 * 64 + \
+            len(self.cfg.rpn_base_apsect_ratios[2]) * 32 * 32 + \
+            len(self.cfg.rpn_base_apsect_ratios[3]) * 16 * 16
+
     def test_forward(self):
         logits_flat, deltas_flat = self.net(self.fs)
 
         batch_size, num_achor, num_classes = logits_flat.size()
         print("logits_flat: ", logits_flat.size())
         self.assertEqual(batch_size, 5)
-        self.assertEqual(num_achor, (16 * 16 + 32 * 32 + 64 * 64 + 128 * 128) * 3)
+        self.assertEqual(num_achor, self.num_anchor)
         self.assertEqual(num_classes, 2)
 
         batch_size, num_achor, num_classes, num_delta = deltas_flat.size()
         print("deltas_flat: ", deltas_flat.size())
         self.assertEqual(batch_size, 5)
-        self.assertEqual(num_achor, (16 * 16 + 32 * 32 + 64 * 64 + 128 * 128) * 3)
+        self.assertEqual(num_achor, self.num_anchor)
         self.assertEqual(num_classes, 2)
         self.assertEqual(num_delta, 4)
 
     def test_rpn_anchors(self):
         rpn_anchor_boxes = rpn_make_anchor_boxes(self.fs, self.cfg)
         print("rpn_anchor_boxes: ", len(rpn_anchor_boxes))
-        self.assertEqual(len(rpn_anchor_boxes), (16 * 16 + 32 * 32 + 64 * 64 + 128 * 128) * 3)
+        self.assertEqual(len(rpn_anchor_boxes), self.num_anchor)
 
 
 class TestROIAlign(unittest.TestCase):

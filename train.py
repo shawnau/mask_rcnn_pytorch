@@ -1,45 +1,44 @@
 import os
+import numpy as np
 import time
 from timeit import default_timer as timer
 from torch import optim
 from torch.utils.data import DataLoader
 
 from configuration import Configuration
+from loader.dsb2018.dataset import ScienceDataset, train_augment, valid_augment, train_collate
 from net.mask_rcnn import MaskRcnnNet
 
-from loader.dsb2018.train_utils import *
+from loader.sampler import *
 from net.utils.file import Logger, time_to_str
 
 
-def validate(cfg, net, test_loader):
+def validate(cfg, net, valid_loader):
+    test_num = 0
+    valid_loss = np.zeros(6, np.float32)
 
-    test_num  = 0
-    test_loss = np.zeros(6, np.float32)
-
-    for inputs, truth_boxes, truth_labels, truth_instances, indices in test_loader:
-
+    for inputs, truth_boxes, truth_labels, truth_instances, indices in valid_loader:
         with torch.no_grad():
             net(inputs.to(cfg.device), truth_boxes, truth_labels, truth_instances)
             loss = net.loss()
 
         batch_size = len(indices)
-        test_loss += batch_size*np.array((
-                           loss.cpu().data.numpy(),
-                           net.rpn_cls_loss.cpu().data.numpy(),
-                           net.rpn_reg_loss.cpu().data.numpy(),
-                           net.rcnn_cls_loss.cpu().data.numpy() if net.rcnn_cls_loss else 0.0,
-                           net.rcnn_reg_loss.cpu().data.numpy() if net.rcnn_reg_loss else 0.0,
-                           net.mask_cls_loss.cpu().data.numpy() if net.mask_cls_loss else 0.0,
-                         ))
+        valid_loss += batch_size * np.array((
+            loss.cpu().data.numpy(),
+            net.rpn_cls_loss.cpu().data.numpy(),
+            net.rpn_reg_loss.cpu().data.numpy(),
+            net.rcnn_cls_loss.cpu().data.numpy() if net.rcnn_cls_loss else 0.0,
+            net.rcnn_reg_loss.cpu().data.numpy() if net.rcnn_reg_loss else 0.0,
+            net.mask_cls_loss.cpu().data.numpy() if net.mask_cls_loss else 0.0,
+        ))
         test_num += batch_size
 
-    assert(test_num == len(test_loader.sampler))
-    test_loss = test_loss/test_num
-    return test_loss
+    assert (test_num == len(valid_loader.sampler))
+    valid_loss = valid_loss / test_num
+    return valid_loss
 
 
 def run_train():
-
     cfg = Configuration()
 
     log = Logger()
@@ -55,30 +54,30 @@ def run_train():
                           weight_decay=0.0001
                           )
 
-    start_iter  = 0
+    start_iter = 0
     start_epoch = 0.
 
     # dataset -------------------------------------------------
     log.write('** dataset setting **\n')
-    train_dataset = ScienceDataset(cfg, 'test/data/train500', mode='train', transform=train_augment)
-    train_loader  = DataLoader(
-                        train_dataset,
-                        sampler=RandomSampler(train_dataset),
-                        batch_size=cfg.batch_size,
-                        drop_last=True,
-                        num_workers=4,
-                        pin_memory=True,
-                        collate_fn=make_collate)
+    train_dataset = ScienceDataset(cfg, 'train', mode='train', transform=train_augment)
+    train_loader = DataLoader(
+        train_dataset,
+        sampler=RandomSampler(train_dataset),
+        batch_size=cfg.batch_size,
+        drop_last=True,
+        num_workers=4,
+        pin_memory=True,
+        collate_fn=train_collate)
 
-    valid_dataset = ScienceDataset(cfg, 'test/data/test1', mode='train', transform=valid_augment)
-    valid_loader  = DataLoader(
-                        valid_dataset,
-                        sampler=SequentialSampler(valid_dataset),
-                        batch_size=cfg.batch_size,
-                        drop_last=False,
-                        num_workers=4,
-                        pin_memory=True,
-                        collate_fn=make_collate)
+    valid_dataset = ScienceDataset(cfg, 'test', mode='train', transform=valid_augment)
+    valid_loader = DataLoader(
+        valid_dataset,
+        sampler=SequentialSampler(valid_dataset),
+        batch_size=cfg.batch_size,
+        drop_last=False,
+        num_workers=4,
+        pin_memory=True,
+        collate_fn=train_collate)
 
     log.write('\tlen(train_dataset)  = %d\n' % len(train_dataset))
     log.write('\tlen(valid_dataset)  = %d\n' % len(valid_dataset))
@@ -86,7 +85,7 @@ def run_train():
     log.write('\tlen(valid_loader)   = %d\n' % len(valid_loader))
     log.write('\tbatch_size  = %d\n' % cfg.batch_size)
     log.write('\titer_accum  = %d\n' % cfg.iter_accum)
-    log.write('\tbatch_size*iter_accum  = %d\n' % (cfg.batch_size*cfg.iter_accum))
+    log.write('\tbatch_size*iter_accum  = %d\n' % (cfg.batch_size * cfg.iter_accum))
     log.write('\n')
 
     # start training here! -------------------------------------------------
@@ -95,12 +94,14 @@ def run_train():
     log.write(' momentum=%f\n' % optimizer.param_groups[0]['momentum'])
 
     log.write(' images_per_epoch = %d\n\n' % len(train_dataset))
-    log.write(' rate    iter   epoch  num   | valid_loss rpnc rpnr rcnnc rcnnr mask | train_loss rpnc rpnr rcnnc rcnnr mask | batch_loss rpnc rpnr rcnnc rcnnr mask |  time          \n')
-    log.write('-------------------------------------------------------------------------------------------------------------------------------------------------------------------\n')
+    log.write(
+        ' rate    iter   epoch  num   | valid    rpnc rpnr    rcnnc rcnnr    mask | train   rpnc rpnr     rcnnc rcnnr    mask | batch   rpnc rpnr     rcnnc rcnnr    mask |  time\n')
+    log.write(
+        '------------------------------------------------------------------------------------------------------------------------------------------------------------------------\n')
 
-    train_loss  = np.zeros(6,np.float32)
-    valid_loss  = np.zeros(6,np.float32)
-    batch_loss  = np.zeros(6,np.float32)
+    train_loss = np.zeros(6, np.float32)
+    valid_loss = np.zeros(6, np.float32)
+    batch_loss = np.zeros(6, np.float32)
     rate = 0
 
     start = timer()
@@ -108,8 +109,8 @@ def run_train():
     i = 0  # iter  counter
 
     while i < cfg.num_iters:  # loop over the dataset multiple times
-        sum_train_loss = np.zeros(6,np.float32)
-        sum_train_acc  = 0.0
+        sum_train_loss = np.zeros(6, np.float32)
+        sum_train_acc = 0.0
         batch_sum = 0
 
         net.set_mode('train')
@@ -118,9 +119,9 @@ def run_train():
             if all(len(b) == 0 for b in truth_boxes):
                 continue
             batch_size = len(indices)
-            i = j/cfg.iter_accum + start_iter
-            epoch = (i-start_iter)*batch_size*cfg.iter_accum/len(train_dataset) + start_epoch
-            num_products = epoch*len(train_dataset)
+            i = j / cfg.iter_accum + start_iter
+            epoch = (i - start_iter) * batch_size * cfg.iter_accum / len(train_dataset) + start_epoch
+            num_products = epoch * len(train_dataset)
             # validate iter -------------------------------------------------
             if i % cfg.iter_valid == 0:
                 net.set_mode('valid')
@@ -128,12 +129,16 @@ def run_train():
                 net.set_mode('train')
 
                 print('\r', end='', flush=True)
-                log.write('%0.4f %5.1f k %6.1f %4.1f m | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %s\n' % (
-                         rate, i/1000, epoch, num_products/1000000,
-                         valid_loss[0], valid_loss[1], valid_loss[2], valid_loss[3], valid_loss[4], valid_loss[5],#valid_acc,
-                         train_loss[0], train_loss[1], train_loss[2], train_loss[3], train_loss[4], train_loss[5],#train_acc,
-                         batch_loss[0], batch_loss[1], batch_loss[2], batch_loss[3], batch_loss[4], batch_loss[5],#batch_acc,
-                         time_to_str((timer() - start)/60)))
+                log.write(
+                    '%0.4f %5.1f k %6.1f %4.1f m | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %s\n' % (
+                        rate, i / 1000, epoch, num_products / 1000000,
+                        valid_loss[0], valid_loss[1], valid_loss[2], valid_loss[3], valid_loss[4], valid_loss[5],
+                        # valid_acc,
+                        train_loss[0], train_loss[1], train_loss[2], train_loss[3], train_loss[4], train_loss[5],
+                        # train_acc,
+                        batch_loss[0], batch_loss[1], batch_loss[2], batch_loss[3], batch_loss[4], batch_loss[5],
+                        # batch_acc,
+                        time_to_str((timer() - start) / 60)))
                 time.sleep(0.01)
             # save checkpoint_dir -------------------------------------------------
             if i % cfg.iter_save == 0:
@@ -143,9 +148,9 @@ def run_train():
                 torch.save(net.state_dict(), model_path)
                 torch.save({
                     'optimizer': optimizer.state_dict(),
-                    'iter'     : i,
-                    'epoch'    : epoch,
-                    }, optimizer_path)
+                    'iter': i,
+                    'epoch': epoch,
+                }, optimizer_path)
 
             # one iteration update  -------------------------------------------------
             net(inputs.to(cfg.device), truth_boxes, truth_labels, truth_instances)
@@ -154,36 +159,40 @@ def run_train():
             # accumulated update
             loss.backward()
             if j % cfg.iter_accum == 0:
-                torch.nn.utils.clip_grad_norm_(net.parameters(), 1) # gradient clip
+                torch.nn.utils.clip_grad_norm_(net.parameters(), 1)  # gradient clip
                 optimizer.step()
                 optimizer.zero_grad()
 
             # print statistics  -------------------------------------------------
-            batch_acc  = 0
+            batch_acc = 0
             batch_loss = np.array((
-                           loss.cpu().data.numpy(),
-                           net.rpn_cls_loss.cpu().data.numpy(),
-                           net.rpn_reg_loss.cpu().data.numpy(),
-                           net.rcnn_cls_loss.cpu().data.numpy(),
-                           net.rcnn_reg_loss.cpu().data.numpy(),
-                           net.mask_cls_loss.cpu().data.numpy(),
-                         ))
+                loss.cpu().data.numpy(),
+                net.rpn_cls_loss.cpu().data.numpy(),
+                net.rpn_reg_loss.cpu().data.numpy(),
+                net.rcnn_cls_loss.cpu().data.numpy(),
+                net.rcnn_reg_loss.cpu().data.numpy(),
+                net.mask_cls_loss.cpu().data.numpy(),
+            ))
             sum_train_loss += batch_loss
-            sum_train_acc  += batch_acc
+            sum_train_acc += batch_acc
             batch_sum += 1
             if i % cfg.iter_smooth == 0:
-                train_loss = sum_train_loss/batch_sum
-                sum_train_loss = np.zeros(6,np.float32)
-                sum_train_acc  = 0.
+                train_loss = sum_train_loss / batch_sum
+                sum_train_loss = np.zeros(6, np.float32)
+                sum_train_acc = 0.
                 batch_sum = 0
 
-            print('\r%0.4f %5.1f k %6.1f %4.1f m | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %s  %d,%d,%s' % (
-                         rate, i/1000, epoch, num_products/1000000,
-                         valid_loss[0], valid_loss[1], valid_loss[2], valid_loss[3], valid_loss[4], valid_loss[5], # valid_acc,
-                         train_loss[0], train_loss[1], train_loss[2], train_loss[3], train_loss[4], train_loss[5], # train_acc,
-                         batch_loss[0], batch_loss[1], batch_loss[2], batch_loss[3], batch_loss[4], batch_loss[5], # batch_acc,
-                         time_to_str((timer() - start)/60), i, j, ''), end='', flush=True)
-            j = j+1
+            print(
+                '\r%0.4f %5.1f k %6.1f %4.1f m | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %s  %d,%d,%s' % (
+                    rate, i / 1000, epoch, num_products / 1000000,
+                    valid_loss[0], valid_loss[1], valid_loss[2], valid_loss[3], valid_loss[4], valid_loss[5],
+                    # valid_acc,
+                    train_loss[0], train_loss[1], train_loss[2], train_loss[3], train_loss[4], train_loss[5],
+                    # train_acc,
+                    batch_loss[0], batch_loss[1], batch_loss[2], batch_loss[3], batch_loss[4], batch_loss[5],
+                    # batch_acc,
+                    time_to_str((timer() - start) / 60), i, j, ''), end='', flush=True)
+            j = j + 1
         pass  # end of one data loader
     pass  # end of all iterations
 
@@ -191,7 +200,6 @@ def run_train():
 
 
 if __name__ == '__main__':
-
     run_train()
 
     print('\nsucess!')
