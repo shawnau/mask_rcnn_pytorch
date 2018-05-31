@@ -61,10 +61,10 @@ class TestTarget(unittest.TestCase):
         self.rcnn_proposals = self.rpn_proposals
 
         self.num_anchor = \
-            len(self.cfg.rpn_base_apsect_ratios[0]) * 128 * 128 + \
-            len(self.cfg.rpn_base_apsect_ratios[1]) * 64 * 64 + \
-            len(self.cfg.rpn_base_apsect_ratios[2]) * 32 * 32 + \
-            len(self.cfg.rpn_base_apsect_ratios[3]) * 16 * 16
+            len(self.cfg.rpn_base_aspect_ratios[0]) * 128 * 128 + \
+            len(self.cfg.rpn_base_aspect_ratios[1]) * 64 * 64 + \
+            len(self.cfg.rpn_base_aspect_ratios[2]) * 32 * 32 + \
+            len(self.cfg.rpn_base_aspect_ratios[3]) * 16 * 16
 
     def test_rpn(self):
         print('=' * 10, 'Test RPN Target', '=' * 10)

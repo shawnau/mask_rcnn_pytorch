@@ -15,7 +15,7 @@ class RpnMultiHead(nn.Module):
         super(RpnMultiHead, self).__init__()
 
         self.num_scales = len(cfg.rpn_scales)
-        self.num_bases = [len(b) for b in cfg.rpn_base_apsect_ratios]
+        self.num_bases = [len(b) for b in cfg.rpn_base_aspect_ratios]
 
         self.convs  = nn.ModuleList()
         self.logits = nn.ModuleList()

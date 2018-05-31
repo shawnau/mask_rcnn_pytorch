@@ -100,7 +100,7 @@ def rpn_make_anchor_boxes(fs, cfg):
     rpn_anchor_boxes = []
     num_scales = len(cfg.rpn_scales)
     for l in range(num_scales):
-        bases = make_bases(cfg.rpn_base_sizes[l], cfg.rpn_base_apsect_ratios[l])
+        bases = make_bases(cfg.rpn_base_sizes[l], cfg.rpn_base_aspect_ratios[l])
         boxes = make_anchor_boxes(fs[l], cfg.rpn_scales[l], bases)
         rpn_anchor_boxes.append(boxes)
 

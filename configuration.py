@@ -9,30 +9,21 @@ class Configuration(object):
         self.version = 'SE-FPN-ResNeXt50'
         self.data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'dsb2018')
         # net
-        # include background class
+        # number of the classes, include background class 0
         self.num_classes = 2
 
         # multi-rpn  --------------------------------------------------------
-        # base size of the anchor box on input image (2*a, diameter?)
+        # base size of the anchor box on input image
         self.rpn_base_sizes = [8, 16, 32, 64]
-        # 4 dirrerent zoom scales from each feature map to input.
-        # used to get stride of anchor boxes
-        # e.g. 2 for p1, 4 for p2, 8 for p3, 16 for p4.
-        # the smaller the feature map is, the bigger the anchor box will be
         self.rpn_scales = [2, 4, 8, 16]
-
+        # anchor
         aspect = lambda s, r: (s * 1 / r ** 0.5, s * r ** 0.5)
-        # self.rpn_base_apsect_ratios = [
-        #    [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
-        #    [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
-        #    [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
-        #    [(1,1), aspect(2**0.5,2), aspect(2**0.5,0.5),],
-        # ]
-        self.rpn_base_apsect_ratios = [
+        self.rpn_base_aspect_ratios = [
             [(1, 1)],
             [(1, 1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), ],
-            [(1, 1), aspect(2 ** 0.5,  1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), aspect(2 ** 0.25, 3), aspect(2 ** 0.25, 0.25), ],
-            [(1, 1), aspect(2 ** 0.5,  1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), ],
+            [(1, 1), aspect(2 ** 0.5, 1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), aspect(2 ** 0.25, 3),
+             aspect(2 ** 0.25, 0.25), ],
+            [(1, 1), aspect(2 ** 0.5, 1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), ],
         ]
 
         self.rpn_train_bg_thresh_high = 0.5
