@@ -7,24 +7,24 @@ from net.utils.func_utils import weighted_focal_loss_for_cross_entropy, weighted
 # "UnitBox: An Advanced Object Detection Network" - Jiahui Yu, Yuning Jiang, Zhangyang Wang, Zhimin Cao, Thomas Huang
 #  https://arxiv.org/abs/1608.01471
 def rpn_encode(window, truth_box):
-    cx = (window[:,0] + window[:,2])/2
-    cy = (window[:,1] + window[:,3])/2
-    w  = (window[:,2] - window[:,0]+1)
-    h  = (window[:,3] - window[:,1]+1)
+    cx = (window[:, 0] + window[:, 2]) / 2
+    cy = (window[:, 1] + window[:, 3]) / 2
+    w  = (window[:, 2] - window[:, 0] + 1)
+    h  = (window[:, 3] - window[:, 1] + 1)
 
-    target = (truth_box - np.column_stack([cx,cy,cx,cy]))/np.column_stack([w,h,w,h])
-    target = target*np.array([-1,-1,1,1],np.float32)
+    target = (truth_box - np.column_stack([cx, cy, cx, cy])) / np.column_stack([w, h, w, h])
+    target = target*np.array([-1, -1, 1, 1], np.float32)
     return target
 
 
 def rpn_decode(window, delta):
-    cx = (window[:,0] + window[:,2])/2
-    cy = (window[:,1] + window[:,3])/2
-    w  = (window[:,2] - window[:,0]+1)
-    h  = (window[:,3] - window[:,1]+1)
+    cx = (window[:, 0] + window[:, 2]) / 2
+    cy = (window[:, 1] + window[:, 3]) / 2
+    w  = (window[:, 2] - window[:, 0] + 1)
+    h  = (window[:, 3] - window[:, 1] + 1)
 
-    delta = delta*np.array([-1,-1,1,1],np.float32)
-    box   = delta*np.column_stack([w,h,w,h]) + np.column_stack([cx,cy,cx,cy])
+    delta = delta*np.array([-1, -1, 1, 1], np.float32)
+    box   = delta*np.column_stack([w, h, w, h]) + np.column_stack([cx, cy, cx, cy])
     return box
 
 

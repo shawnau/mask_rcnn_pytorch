@@ -5,8 +5,8 @@ from torch.nn import functional as F
 
 def rcnn_encode(bboxes, targets):
     """
-    :param bboxes: bboxes
-    :param targets: target ground truth boxes
+    :param bboxes: (N, 4) bounding boxes of [x0, y0, x1, y1]
+    :param targets: (N, 4) target ground truth boxes of [x0, y0, x1, y1]
     :return: deltas
     """
 
@@ -31,18 +31,18 @@ def rcnn_encode(bboxes, targets):
 
 def rcnn_decode(bboxes, deltas):
     """
-    :param bboxes: bounding boxes
-    :param deltas: bbox regression deltas
+    :param bboxes: (N, 4) bounding boxes
+    :param deltas: (N, 4) bbox regression deltas of [dx, dy, dw, dh]
     :return: refined bboxes
     """
     num = len(bboxes)
     predictions = np.zeros((num, 4), dtype=np.float32)
-    # if num == 0: return predictions  #not possible?
 
     bw = bboxes[:, 2] - bboxes[:, 0] + 1.0
     bh = bboxes[:, 3] - bboxes[:, 1] + 1.0
     bx = bboxes[:, 0] + 0.5 * bw
     by = bboxes[:, 1] + 0.5 * bh
+
     bw = bw[:, np.newaxis]
     bh = bh[:, np.newaxis]
     bx = bx[:, np.newaxis]
@@ -55,8 +55,7 @@ def rcnn_decode(bboxes, deltas):
 
     x = dx * bw + bx
     y = dy * bh + by
-    dw = np.clip(dw, -10, 10)
-    dh = np.clip(dh, -10, 10)
+
     w = np.exp(dw) * bw
     h = np.exp(dh) * bh
 
