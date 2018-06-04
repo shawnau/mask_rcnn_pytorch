@@ -2,11 +2,12 @@ import os
 import cv2
 import torch
 from torch.utils.data.dataset import Dataset
+from pycocotools.coco import COCO
 
 from loader.transforms import np, random_crop_transform, fix_crop_transform
 
 
-class ScienceDataset(Dataset):
+class CocoDataset(Dataset):
     """
     train mode:
         :return:
@@ -18,29 +19,30 @@ class ScienceDataset(Dataset):
             for 3 masks in a 4*4 input
         index: index of the image (unique)
     """
-    def __init__(self, cfg, split, transform=None, mode='train'):
-        super(ScienceDataset, self).__init__()
+    def __init__(self, cfg, dataDir, dataType='train2017', transform=None, mode='train'):
+        super(CocoDataset, self).__init__()
+
+        self.dataDir = dataDir
+        self.dataType = dataType
+        self.annFile = '{}/annotations/instances_{}.json'.format(self.dataDir, self.dataType)
 
         self.cfg = cfg
         self.transform = transform
         self.mode = mode
-
-        # read split
-        # self.ids = [x.split('.')[0] for x in listdir(os.path.join(self.cfg.data_dir, 'images'))]
-        with open(os.path.join(self.cfg.data_dir, 'splits', split)) as f:
-            self.ids = [x.strip() for x in f.readlines() if x != '']
+        self.coco = COCO(self.annFile)
 
     def __getitem__(self, index):
-        name = self.ids[index]
-        image_path = os.path.join(self.cfg.data_dir, 'images', '%s.png' % name)
-        image  = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        imgIds = self.coco.getImgIds(imgIds=[index])
+        img_obj = self.coco.loadImgs(imgIds[0])[0]
+
+        image_path = os.path.join(self.dataDir, 'images', self.dataType, img_obj['file_name'])
+        image = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
         if self.mode in ['train']:
-            multi_mask_path = os.path.join(self.cfg.data_dir, 'multi_masks', '%s.npy' % name)
-            multi_mask = np.load(multi_mask_path).astype(np.int32)
+            multi_mask, idx_to_cls = self.instances_to_multi_mask(img_obj)
 
             if self.transform is not None:
-                return self.transform(image, multi_mask, index)
+                return self.transform(image, multi_mask, idx_to_cls, index)
             else:
                 return image, multi_mask, index
 
@@ -51,10 +53,38 @@ class ScienceDataset(Dataset):
                 return image, index
 
     def __len__(self):
-        return len(self.ids)
+        return len(self.coco.imgs)
+
+    def instances_to_multi_mask(self, img_obj):
+        """
+        https://zhuanlan.zhihu.com/p/29393415
+        :param img_obj: coco image object
+        :return:
+            multi_mask: (H, W) ndarray multi masks
+            ret_bbox: (N, 4) ndarray bboxes
+            idx_to_cls: dict to map idx into class
+        """
+        H, W = img_obj['height'], img_obj['width']
+        annIds = self.coco.getAnnIds(imgIds=img_obj['id'], iscrowd=None)
+        anns = self.coco.loadAnns(annIds)
+
+        multi_mask = np.zeros((H, W), np.int32)
+        idx_to_cls = {}
+        for i, ann in enumerate(anns):
+            # bbox = ann['bbox']
+            # x0, y0 = bbox[0], bbox[1] - bbox[3]
+            # x1, y1 = bbox[0] + bbox[2], bbox[1]
+
+            cls = ann['category_id']
+            binary = self.coco.annToMask(ann)
+            assert binary.shape == multi_mask.shape
+            multi_mask[binary == 1] = i + 1
+            idx_to_cls[i+1] = cls
+
+        return multi_mask, idx_to_cls
 
 
-def multi_mask_to_annotation(multi_mask):
+def multi_mask_to_annotation(multi_mask, idx_to_cls):
     """
     :param multi_mask: a map records masks. e.g.
         [[0, 1, 1, 0],
@@ -73,8 +103,8 @@ def multi_mask_to_annotation(multi_mask):
     """
     H,W      = multi_mask.shape[:2]
     boxes      = []
-    labels    = []
-    instances = []
+    labels     = []
+    instances  = []
 
     idxs = [x for x in np.unique(multi_mask) if x != 0]
     for idx in idxs:
@@ -88,8 +118,6 @@ def multi_mask_to_annotation(multi_mask):
         w = (x1-x0)+1
         h = (y1-y0)+1
 
-        # border = max(1, round(0.1*min(w,h)))
-        # border = 0
         border = max(2, round(0.2*(w+h)/2))
 
         x0 = x0-border
@@ -103,15 +131,15 @@ def multi_mask_to_annotation(multi_mask):
         x1 = min(W-1,x1)
         y1 = min(H-1,y1)
 
-        boxes.append([x0,y0,x1,y1])
-        labels.append(1)
+        boxes.append([x0, y0, x1, y1])
+        labels.append(idx_to_cls[idx])
         instances.append(mask)
 
     boxes     = np.array(boxes,  np.float32)
     labels    = np.array(labels, np.int64)
     instances = np.array(instances, np.float32)
 
-    if len(boxes)==0:
+    if len(boxes) == 0:
         boxes     = np.zeros((0, 4), np.float32)
         labels    = np.zeros((0, ), np.int64)
         instances = np.zeros((0, H, W), np.float32)
@@ -119,7 +147,7 @@ def multi_mask_to_annotation(multi_mask):
     return boxes, labels, instances
 
 
-def train_augment(image, multi_mask, index):
+def train_augment(image, multi_mask, idx_to_cls, index):
     WIDTH, HEIGHT = 256, 256
 
     # image, multi_mask = \
@@ -138,17 +166,17 @@ def train_augment(image, multi_mask, index):
 
     # image read from opencv has the dimension of (Height, Width, Channels)
     input_image = torch.from_numpy(image.transpose((2, 0, 1))).float().div(255)
-    boxes, labels, instances = multi_mask_to_annotation(multi_mask)
+    boxes, labels, instances = multi_mask_to_annotation(multi_mask, idx_to_cls)
 
     return input_image, boxes, labels, instances, index
 
 
-def valid_augment(image, multi_mask, index):
+def valid_augment(image, multi_mask, idx_to_cls, index):
     WIDTH, HEIGHT = 256, 256
 
     image, multi_mask = fix_crop_transform(image, multi_mask, -1, -1, WIDTH, HEIGHT)
     input_image = torch.from_numpy(image.transpose((2,0,1))).float().div(255)
-    box, label, instance = multi_mask_to_annotation(multi_mask)
+    box, label, instance = multi_mask_to_annotation(multi_mask, idx_to_cls)
 
     return input_image, box, label, instance, index
 

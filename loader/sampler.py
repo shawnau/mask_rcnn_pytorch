@@ -3,7 +3,7 @@ from torch.utils.data.sampler import *
 
 
 class ConstantSampler(Sampler):
-    def __init__(self, data, list):
+    def __init__(self, list):
         self.num_samples = len(list)
         self.list = list
 

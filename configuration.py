@@ -8,6 +8,7 @@ class Configuration(object):
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.version = 'SE-FPN-ResNeXt50'
         self.data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'dsb2018')
+        # self.data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'coco2017')
         # net ---------------------------------------------------------------
         # number of the classes, including background class 0
         self.num_classes = 2
