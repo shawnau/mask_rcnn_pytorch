@@ -154,3 +154,7 @@ fabric.properties
 
 # OSX
 .DS_Store
+
+# training data
+*.png
+*.npy
