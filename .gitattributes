@@ -1,2 +1,2 @@
 *.ipynb linguist-vendored=false
-doc/*.ipynb linguist-vendored=false
+doc/mask-rcnn-intro.ipynb linguist-detectable=false
