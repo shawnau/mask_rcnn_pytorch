@@ -76,8 +76,6 @@ def fix_crop_transform(image, mask, x, y, w, h):
     """
 
     H, W = image.shape[:2]
-    assert (H >= h)
-    assert (W >= w)
 
     if (x == -1 & y == -1):
         x = (W - w) // 2

@@ -6,7 +6,7 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 from configuration import Configuration
-from loader.coco.dataset import CocoDataset, train_augment, valid_augment, train_collate
+from loader.dsb2018.dataset import ScienceDataset, train_augment, valid_augment, train_collate
 from net.mask_rcnn import MaskRcnnNet
 
 from loader.sampler import *
@@ -59,20 +59,20 @@ def run_train():
 
     # dataset -------------------------------------------------
     log.write('** dataset setting **\n')
-    train_dataset = CocoDataset(cfg, cfg.data_dir, mode='train', transform=train_augment)
+    train_dataset = ScienceDataset(cfg, 'train', mode='train', transform=train_augment)
     train_loader = DataLoader(
         train_dataset,
-        sampler=ConstantSampler([9, 25, 30, 34, 36, 42]),
+        sampler=RandomSampler(train_dataset),
         batch_size=cfg.batch_size,
         drop_last=True,
         num_workers=4,
         pin_memory=True,
         collate_fn=train_collate)
 
-    valid_dataset = CocoDataset(cfg, cfg.data_dir, mode='train', transform=valid_augment)
+    valid_dataset = ScienceDataset(cfg, 'test', mode='train', transform=valid_augment)
     valid_loader = DataLoader(
         valid_dataset,
-        sampler=ConstantSampler([9, 25, 30, 34, 36, 42]),
+        sampler=SequentialSampler(valid_dataset),
         batch_size=cfg.batch_size,
         drop_last=False,
         num_workers=4,
