@@ -18,7 +18,7 @@ if torch.cuda.is_available():
     with_cuda = True
 
 #extra_compile_args = ['-std=c99'] # for MAC OSX
-extra_compile_args = ['-fopenmp', '-std=c99']
+# extra_compile_args = ['-fopenmp', '-std=c99']
 
 this_file = os.path.dirname(os.path.realpath(__file__))
 print(this_file)
@@ -34,7 +34,8 @@ ffi = create_extension(
     relative_to=__file__,
     with_cuda=with_cuda,
     extra_objects=extra_objects,
-    extra_compile_args=extra_compile_args
+    libraries = ['ATen', '_C']
+    # extra_compile_args=extra_compile_args
 )
 
 if __name__ == '__main__':

@@ -20,7 +20,7 @@ ext_modules = [
     Extension(
         "cython_nms",
         ["cython_nms.pyx"],
-        extra_compile_args=["-Wno-cpp", "-Wno-unused-function"],
+        # extra_compile_args=["-Wno-cpp", "-Wno-unused-function"],
         include_dirs = [numpy_include]
     ),
 ]
