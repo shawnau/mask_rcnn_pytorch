@@ -76,8 +76,6 @@ def fix_crop_transform(image, mask, x, y, w, h):
     """
 
     H, W = image.shape[:2]
-    assert (H >= h)
-    assert (W >= w)
 
     if (x == -1 & y == -1):
         x = (W - w) // 2
@@ -100,9 +98,9 @@ def random_crop_transform(image, mask, w, h, u=0.5):
     :return:
     """
     x, y = -1, -1
-    H, W = image.shape[:2]
 
     if random.random() < u:
+        H, W = image.shape[:2]
         if H != h:
             y = np.random.choice(H - h)
         else:

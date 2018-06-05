@@ -64,8 +64,9 @@ Modify `-arch` keyword for these 2 files according to your gpu's arch above
 
 ## Use
 
-### Test
-See `demo.ipynb`
+### Test on Data Science Bowl 2018 image
+ - Download [pretrained grayscale model](https://drive.google.com/open?id=1E61LL0fPMVeYhPAZCbt3A6PbmM8vj4Ku) into project root folder.
+ - Run `demo.ipynb`
 
 ### Train
 1. Train Nuclei Segmentation Model of Data Science Bowl 2018

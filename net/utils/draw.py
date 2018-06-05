@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 
+
 def image_show(name, image, resize=1):
     H, W = image.shape[0:2]
     cv2.namedWindow(name, cv2.WINDOW_NORMAL)
@@ -19,6 +20,18 @@ def draw_boxes(image, boxes, color=(0, 0, 255)):
     for box in boxes:
         x0, y0, x1, y1 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
         cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
+
+
+def draw_proposals(image, proposals, color=(0, 0, 255)):
+    proposals = proposals.detach().numpy()
+    for i in range(proposals.shape[0]):
+        box = proposals[i, 1:5]
+        x0, y0, x1, y1 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
+
+        score = proposals[i, 5]
+        label = proposals[i, 6]
+        cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
+        cv2.putText(image, "%.2f"%score, (x0, y0), 0, 0.3, (255, 0, 0))
 
 
 def instances_to_color_overlay(instances, image=None, color=None):
