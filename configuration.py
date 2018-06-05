@@ -7,24 +7,22 @@ class Configuration(object):
         super(Configuration, self).__init__()
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.version = 'SE-FPN-ResNeXt50'
-        self.data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'dsb2018')
-        # self.data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'coco2017')
+        self.data_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'coco2017')
         # net ---------------------------------------------------------------
         # number of the classes, including background class 0
-        self.num_classes = 2
+        self.num_classes = 80 + 1
 
         # multi-rpn  --------------------------------------------------------
         # base size of the anchor box on input image
-        self.rpn_base_sizes = [8, 16, 32, 64]
-        self.rpn_scales = [2, 4, 8, 16]
+        self.rpn_base_sizes = [32, 64, 128, 256]
+        self.rpn_scales = [4, 8, 16, 32]
         # anchor aspects. please referring to the doc
         aspect = lambda s, r: (s * 1 / r ** 0.5, s * r ** 0.5)
         self.rpn_base_aspect_ratios = [
-            [(1, 1)],
-            [(1, 1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), ],
-            [(1, 1), aspect(2 ** 0.5, 1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), aspect(2 ** 0.25, 3),
-             aspect(2 ** 0.25, 0.25), ],
-            [(1, 1), aspect(2 ** 0.5, 1), aspect(2 ** 0.25, 2), aspect(2 ** 0.25, 0.5), ],
+           [(1, 1), aspect(2**0.5, 2), aspect(2**0.5, 0.5), ],
+           [(1, 1), aspect(2**0.5, 2), aspect(2**0.5, 0.5), ],
+           [(1, 1), aspect(2**0.5, 2), aspect(2**0.5, 0.5), ],
+           [(1, 1), aspect(2**0.5, 2), aspect(2**0.5, 0.5), ],
         ]
         # background: 0.0 < overlap < 0.5
         # foreground: 0.5 < overlap < 1.0
@@ -33,12 +31,12 @@ class Configuration(object):
 
         # select anchor boxes with
         # score > 0.5, overlap > 0.85 , size > 5 pixel^2 as nms output for training
-        self.rpn_train_nms_pre_score_threshold = 0.50
+        self.rpn_train_nms_pre_score_threshold = 0.70
         self.rpn_train_nms_overlap_threshold   = 0.85
         self.rpn_train_nms_min_size = 5
         # same as training
-        self.rpn_test_nms_pre_score_threshold = 0.60
-        self.rpn_test_nms_overlap_threshold   = 0.75
+        self.rpn_test_nms_pre_score_threshold = 0.70
+        self.rpn_test_nms_overlap_threshold   = 0.85
         self.rpn_test_nms_min_size = 5
 
         # rcnn ------------------------------------------------------------------
@@ -53,7 +51,7 @@ class Configuration(object):
         self.rcnn_train_nms_overlap_threshold   = 0.85
         self.rcnn_train_nms_min_size = 8
 
-        self.rcnn_test_nms_pre_score_threshold = 0.50
+        self.rcnn_test_nms_pre_score_threshold = 0.70
         self.rcnn_test_nms_overlap_threshold   = 0.85
         self.rcnn_test_nms_min_size = 8
 
@@ -64,9 +62,9 @@ class Configuration(object):
         self.mask_train_min_size       = 8
         self.mask_train_fg_thresh_low  = self.rpn_train_fg_thresh_low
         # same as rpn
-        self.mask_test_nms_pre_score_threshold = 0.5
+        self.mask_test_nms_pre_score_threshold = 0.3
         self.mask_test_nms_overlap_threshold = 0.2
-        self.mask_test_mask_threshold  = 0.5
+        self.mask_test_mask_threshold  = 0.5  # mask binary threshold
         self.mask_test_mask_min_area = 8
 
         # optim -----------------------------------------------------------------
