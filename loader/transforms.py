@@ -26,6 +26,29 @@ def pad_to_factor(image, factor=16):
     return image
 
 
+def pad_to_size(image, mask, width, height):
+    """
+    padding image to specified size
+    :param image:
+    :return:
+    """
+    img_height, img_width = image.shape[:2]
+    assert height > img_height
+    assert width > img_width
+    delta_w = width - img_width
+    delta_h = height - img_height
+    top, bottom = delta_h // 2, delta_h - (delta_h // 2)
+    left, right = delta_w // 2, delta_w - (delta_w // 2)
+
+    image = cv2.copyMakeBorder(image, top, bottom, left, right,
+                               borderType=cv2.BORDER_CONSTANT,
+                               value=[0, 0, 0])
+    mask  = cv2.copyMakeBorder(mask, top, bottom, left, right,
+                               borderType=cv2.BORDER_CONSTANT,
+                               value=[0, 0, 0])
+    return image, mask
+
+
 def resize_to_factor(image, mask, factor=16):
     H, W = image.shape[:2]
     h = (H // factor) * factor
@@ -77,6 +100,7 @@ def random_crop_transform(image, mask, w, h, u=0.5):
     :return:
     """
     x, y = -1, -1
+
     if random.random() < u:
         H, W = image.shape[:2]
         if H != h:

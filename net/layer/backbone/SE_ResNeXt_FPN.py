@@ -87,7 +87,7 @@ class SEResNeXtFPN(nn.Module):
             nn.Conv2d(3, 64, 7, stride=2, padding=3, bias=False),  # (224-7+2*3) // 2 +1 = 112
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
-            # nn.MaxPool2d(kernel_size=3, stride=2, padding=1) # shrink to 1/4 of original size
+            nn.MaxPool2d(kernel_size=3, stride=2, padding=1)  # shrink to 1/4 of original size
         )
 
     def _make_stage(self, i_ch, o_ch, num_blocks, stride=1):
@@ -132,6 +132,5 @@ class SEResNeXtFPN(nn.Module):
         p3 = self.layer_p3(c3, p4)
         p2 = self.layer_p2(c2, p3)
 
-        # given input p1=256*256, p2=128*128, p3=64*64, p4=32*32, p5=16*16
         features = [p2, p3, p4, p5]
         return features

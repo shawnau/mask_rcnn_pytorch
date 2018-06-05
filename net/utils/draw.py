@@ -17,7 +17,7 @@ def draw_screen_rect(image, point1, point2, color, alpha=0.5):
 
 def draw_boxes(image, boxes, color=(0, 0, 255)):
     for box in boxes:
-        x0, y0, x1, y1 = box[0], box[1], box[2], box[3]
+        x0, y0, x1, y1 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
         cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
 
 
