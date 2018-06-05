@@ -1,5 +1,6 @@
+
 # Mask RCNN PyTorch
-PyTorch 0.4 implementation of Mask-RCNN.
+PyTorch 0.4 implementation of Mask-RCNN. This was the side-project of Kaggle Data Science Bowl 2018
 
 Features:
 
@@ -14,12 +15,13 @@ Ubuntu 16.04/macOS High Sierra
  - [Anaconda 3](https://anaconda.org)
  - [PyTorch 0.4.0](https://pytorch.org)
  - [python opencv 3](https://pypi.org/project/opencv-python/)
- - [Cython](http://cython.org)
+ - [Cython](http://cython.org) (included in anaconda)
 
 Optional:
  - GPU with CUDA support
 
 ```bash
+# install requirements
 cd /tmp
 curl -O https://repo.continuum.io/archive/Anaconda3-5.0.1-Linux-x86_64.sh
 bash Anaconda3-5.0.1-Linux-x86_64.sh
@@ -39,10 +41,18 @@ git clone https://github.com/shawnau/mask_rcnn_pytorch.git
 cd mask_rcnn_pytorch
 ```
 
-### Get GPU Arch (Optinal for gpu users)
-https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html#virtual-architecture-feature-list
+### Get GPU Arch for cuda compiler (Optinal for gpu users)
 
-Modify these 2 files according to your gpu's arch
+| model | arch |
+|--|--|
+| GTX-970, GTX-980, GTX Titan X | sm_52 |
+| Tesla P100 | sm_60 |
+| GTX 10XX, Titan Xp, Tesla P40| sm_61 |
+| Tesla V100 | sm_70 |
+
+[Official Doc](https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html#virtual-architecture-feature-list)
+
+Modify `-arch` keyword for these 2 files according to your gpu's arch above
  - [build_gpu.sh](https://github.com/shawnau/mask_rcnn_pytorch/blob/0c26d5dfaedbdf8ada0f96163a1e1f4103c2a843/build_gpu.sh#L11)
  - [net/lib/roi_align/src/Makefile](https://github.com/shawnau/mask_rcnn_pytorch/blob/0c26d5dfaedbdf8ada0f96163a1e1f4103c2a843/net/lib/roi_align/src/Makefile#L2)
 
@@ -58,7 +68,24 @@ Modify these 2 files according to your gpu's arch
 See `demo.ipynb`
 
 ### Train
-See `train.py`
+1. Train Nuclei Segmentation Model of Data Science Bowl 2018
+ - Download  and unzip `stage1_train.zip` from [Download Page](https://www.kaggle.com/c/data-science-bowl-2018/data), put it into `data/`
+ - Run `data/convert.py` for preprocessing
+ - Run  `train.py`
+
+2. Train MS COCO Detection 2017 Dataset
+ - `git checkout coco`
+ - Download coco dataset, put into `data/` on following structure:
+
+```
+coco2017
+    ├── annotations
+    │   └── instances_train2017.json
+    └── images
+        └── train2017
+            └── *.jpg
+```
+  - Run `train.py`
 
 ## Development
 
@@ -94,3 +121,8 @@ net
     ├── file.py             io
     └── func_utils.py       loss functions
 ```
+
+## To-do
+ - [ ] Pretrained model on MS COCO
+ - [ ] Using PIL instead of opencv
+ - [ ] Pure PyTorch RoiAlign, nms and overlap
