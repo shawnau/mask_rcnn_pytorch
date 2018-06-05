@@ -4,7 +4,7 @@ import torch
 from torch.utils.data.dataset import Dataset
 from pycocotools.coco import COCO
 
-from loader.transforms import np, random_crop_transform, fix_crop_transform
+import numpy as np
 
 
 class CocoDataset(Dataset):
@@ -31,6 +31,12 @@ class CocoDataset(Dataset):
         self.mode = mode
         self.coco = COCO(self.annFile)
 
+        # class id re-hashing
+        cls_ids = self.coco.getCatIds()
+        self.ids_lookup = {}
+        for i, cls_id in enumerate(cls_ids):
+            self.ids_lookup[cls_id] = i + 1
+
     def __getitem__(self, index):
         imgIds = self.coco.getImgIds(imgIds=[index])
         img_obj = self.coco.loadImgs(imgIds[0])[0]
@@ -39,12 +45,12 @@ class CocoDataset(Dataset):
         image = cv2.imread(image_path, cv2.IMREAD_COLOR)
 
         if self.mode in ['train']:
-            multi_mask, idx_to_cls = self.instances_to_multi_mask(img_obj)
+            instances, labels = self.ann_to_instances(img_obj)
 
             if self.transform is not None:
-                return self.transform(image, multi_mask, idx_to_cls, index)
+                return self.transform(image, instances, labels, index)
             else:
-                return image, multi_mask, index
+                return image, instances, labels, index
 
         if self.mode in ['test']:
             if self.transform is not None:
@@ -55,7 +61,7 @@ class CocoDataset(Dataset):
     def __len__(self):
         return len(self.coco.imgs)
 
-    def instances_to_multi_mask(self, img_obj):
+    def ann_to_instances(self, img_obj):
         """
         https://zhuanlan.zhihu.com/p/29393415
         :param img_obj: coco image object
@@ -64,121 +70,103 @@ class CocoDataset(Dataset):
             ret_bbox: (N, 4) ndarray bboxes
             idx_to_cls: dict to map idx into class
         """
-        H, W = img_obj['height'], img_obj['width']
+        # H, W = img_obj['height'], img_obj['width']
         annIds = self.coco.getAnnIds(imgIds=img_obj['id'], iscrowd=None)
         anns = self.coco.loadAnns(annIds)
 
-        multi_mask = np.zeros((H, W), np.int32)
-        idx_to_cls = {}
+        instances = []
+        labels = []
         for i, ann in enumerate(anns):
             # bbox = ann['bbox']
             # x0, y0 = bbox[0], bbox[1] - bbox[3]
             # x1, y1 = bbox[0] + bbox[2], bbox[1]
+            instances.append(self.coco.annToMask(ann))
+            labels.append(self.ids_lookup[ann['category_id']])
 
-            cls = ann['category_id']
-            binary = self.coco.annToMask(ann)
-            assert binary.shape == multi_mask.shape
-            multi_mask[binary == 1] = i + 1
-            idx_to_cls[i+1] = cls
-
-        return multi_mask, idx_to_cls
+        return instances, labels
 
 
-def multi_mask_to_annotation(multi_mask, idx_to_cls):
-    """
-    :param multi_mask: a map records masks. e.g.
-        [[0, 1, 1, 0],
-         [2, 0, 0, 3],
-         [2, 0, 3, 3]]
-        for 3 masks in a 4*4 input
-    :return:
-        boxes: lists of secondary diagonal coords. e.g.
-            [[x0, y0, x1, y1], ...]
-        labels: currently all labels are 1 (for foreground only)
-        instances: list of one vs all masks. e.g.
-            [[[0, 1, 1, 0],
-              [0, 0, 0, 0],
-              [0, 0, 0, 0]], ...]
-            for thr first mask of all masks, a total of 3 lists in this case
-    """
-    H,W      = multi_mask.shape[:2]
-    boxes      = []
-    labels     = []
-    instances  = []
+def instance_to_box(instance):
+    H, W = instance.shape[:2]
 
-    idxs = [x for x in np.unique(multi_mask) if x != 0]
-    for idx in idxs:
-        mask = (multi_mask == idx)
+    y, x = np.where(instance)
+    y0 = y.min()
+    y1 = y.max()
+    x0 = x.min()
+    x1 = x.max()
+    w = (x1 - x0) + 1
+    h = (y1 - y0) + 1
 
-        y, x = np.where(mask)
-        y0 = y.min()
-        y1 = y.max()
-        x0 = x.min()
-        x1 = x.max()
-        w = (x1-x0)+1
-        h = (y1-y0)+1
+    border = max(2, round(0.05 * (w + h) / 2))
 
-        border = max(2, round(0.2*(w+h)/2))
+    x0 = x0 - border
+    x1 = x1 + border
+    y0 = y0 - border
+    y1 = y1 + border
 
-        x0 = x0-border
-        x1 = x1+border
-        y0 = y0-border
-        y1 = y1+border
+    # clip
+    x0 = max(0, x0)
+    y0 = max(0, y0)
+    x1 = min(W - 1, x1)
+    y1 = min(H - 1, y1)
 
-        # clip
-        x0 = max(0,x0)
-        y0 = max(0,y0)
-        x1 = min(W-1,x1)
-        y1 = min(H-1,y1)
-
-        boxes.append([x0, y0, x1, y1])
-        labels.append(idx_to_cls[idx])
-        instances.append(mask)
-
-    boxes     = np.array(boxes,  np.float32)
-    labels    = np.array(labels, np.int64)
-    instances = np.array(instances, np.float32)
-
-    if len(boxes) == 0:
-        boxes     = np.zeros((0, 4), np.float32)
-        labels    = np.zeros((0, ), np.int64)
-        instances = np.zeros((0, H, W), np.float32)
-
-    return boxes, labels, instances
+    return [x0, y0, x1, y1]
 
 
-def train_augment(image, multi_mask, idx_to_cls, index):
-    WIDTH, HEIGHT = 256, 256
+def train_augment(image, instances, labels, index):
+    WIDTH, HEIGHT = 512, 512
 
-    # image, multi_mask = \
-    #    random_shift_scale_rotate_transform(
-    #        image, multi_mask,
-    #        shift_limit=[0, 0],
-    #        scale_limit=[1/2, 2],
-    #        rotate_limit=[-45, 45],
-    #        borderMode=cv2.BORDER_REFLECT_101,
-    #        u=0.5)
-    #
-    image, multi_mask = random_crop_transform(image, multi_mask, WIDTH, HEIGHT, u=0.5)
-    # image, multi_mask = random_horizontal_flip_transform(image, multi_mask, 0.5)
-    # image, multi_mask = random_vertical_flip_transform(image, multi_mask, 0.5)
-    # image, multi_mask = random_rotate90_transform(image, multi_mask, 0.5)
+    img_height, img_width = image.shape[:2]
+    if (img_height, img_width) != (HEIGHT, WIDTH):
+        image = cv2.resize(image, (WIDTH, HEIGHT))
+        ret_instances = []
+        boxes = []
+        for instance in instances:
+            instance = instance.astype(np.float32)
+            instance = cv2.resize(instance, (WIDTH, HEIGHT), cv2.INTER_NEAREST)
+            instance = instance.astype(np.int32)
+            ret_instances.append(instance)
+            boxes.append(instance_to_box(instance))
+    else:
+        ret_instances = instances
+        boxes = [instance_to_box(instance) for instance in instances]
 
     # image read from opencv has the dimension of (Height, Width, Channels)
     input_image = torch.from_numpy(image.transpose((2, 0, 1))).float().div(255)
-    boxes, labels, instances = multi_mask_to_annotation(multi_mask, idx_to_cls)
 
-    return input_image, boxes, labels, instances, index
+    assert len(instances) == len(labels)
+    ret_instances = np.array(ret_instances)
+    labels = np.array(labels)
+    boxes = np.array(boxes).astype(np.float32)
+    return input_image, boxes, labels, ret_instances, index
 
 
-def valid_augment(image, multi_mask, idx_to_cls, index):
-    WIDTH, HEIGHT = 256, 256
+def valid_augment(image, instances, labels, index):
+    WIDTH, HEIGHT = 512, 512
 
-    image, multi_mask = fix_crop_transform(image, multi_mask, -1, -1, WIDTH, HEIGHT)
-    input_image = torch.from_numpy(image.transpose((2,0,1))).float().div(255)
-    box, label, instance = multi_mask_to_annotation(multi_mask, idx_to_cls)
+    img_height, img_width = image.shape[:2]
+    if (img_height, img_width) != (HEIGHT, WIDTH):
+        image = cv2.resize(image, (WIDTH, HEIGHT))
+        ret_instances = []
+        boxes = []
+        for instance in instances:
+            instance = instance.astype(np.float32)
+            instance = cv2.resize(instance, (WIDTH, HEIGHT), cv2.INTER_NEAREST)
+            instance = instance.astype(np.int32)
+            ret_instances.append(instance)
+            boxes.append(instance_to_box(instance))
+    else:
+        ret_instances = instances
+        boxes = [instance_to_box(instance) for instance in instances]
 
-    return input_image, box, label, instance, index
+    # image read from opencv has the dimension of (Height, Width, Channels)
+    input_image = torch.from_numpy(image.transpose((2, 0, 1))).float().div(255)
+
+    assert len(instances) == len(labels)
+    ret_instances = np.array(ret_instances)
+    labels = np.array(labels)
+    boxes = np.array(boxes).astype(np.float32)
+    return input_image, boxes, labels, ret_instances, index
 
 
 def train_collate(batch):
