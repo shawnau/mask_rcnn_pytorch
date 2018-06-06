@@ -1,6 +1,6 @@
 
 # Mask RCNN PyTorch
-PyTorch 0.4 implementation of Mask-RCNN. This was the side-project of Kaggle Data Science Bowl 2018
+PyTorch 0.4 implementation of Mask-RCNN. This was the side-project of our work in [Kaggle Data Science Bowl 2018](https://github.com/shawnau/DataScienceBowl2018)
 
 Features:
 
@@ -10,7 +10,11 @@ Features:
 
 ## Requirements
 
-Ubuntu 16.04/macOS High Sierra
+The code is tested under following system
+
+1. Ubuntu 16.04 (CPU/Nvidia GPU)
+2. macOS High Sierra (CPU version)
+3. Windows 10 (CPU version), please checkout to `win10` branch
 
  - [Anaconda 3](https://anaconda.org)
  - [PyTorch 0.4.0](https://pytorch.org)
@@ -76,7 +80,7 @@ Modify `-arch` keyword for these 2 files according to your gpu's arch above
 
 2. Train MS COCO Detection 2017 Dataset
  - `git checkout coco`
- - Download coco dataset, put into `data/` on following structure:
+ - Download coco dataset, put into `data/` with following structure:
 
 ```
 coco2017
@@ -89,6 +93,7 @@ coco2017
   - Run `train.py`
 
 ## Development
+Project Structure: see `doc/`
 
 Code Structure
 ```
@@ -127,3 +132,8 @@ net
  - [ ] Pretrained model on MS COCO
  - [ ] Using PIL instead of opencv
  - [ ] Pure PyTorch RoiAlign, nms and overlap
+
+## Difference from the original paper
+
+1. We use the idea of [UnitBox](https://arxiv.org/abs/1608.01471) for rpn anchor box regression.
+2. Training code resizes all the images into `512*512`, which could be improved.
