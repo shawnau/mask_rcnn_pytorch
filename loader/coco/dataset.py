@@ -8,18 +8,14 @@ import numpy as np
 
 
 class CocoDataset(Dataset):
-    """
-    train mode:
-        :return:
-        image: (H, W, C) numpy array
-        multi_mask: a map records masks. e.g.
-            [[0, 1, 1, 0],
-             [2, 0, 0, 3],
-             [2, 0, 3, 3]]
-            for 3 masks in a 4*4 input
-        index: index of the image (unique)
-    """
     def __init__(self, cfg, dataDir, dataType='train2017', transform=None, mode='train'):
+        """
+        :param cfg:
+        :param dataDir: root dir for coco dataset
+        :param dataType: train2017 or valid2017 for training and validation
+        :param transform: train/test time augmentation
+        :param mode: train/valid/test
+        """
         super(CocoDataset, self).__init__()
 
         self.dataDir = dataDir
