@@ -72,7 +72,7 @@ def run_train():
     valid_dataset = CocoDataset(cfg, cfg.data_dir, dataType='valid2017', mode='train', transform=valid_augment)
     valid_loader = DataLoader(
         valid_dataset,
-        sampler=SequentialSampler(valid_dataset),
+        sampler=FixLengthRandomSampler(valid_dataset, length=20),
         batch_size=cfg.batch_size,
         drop_last=False,
         num_workers=4,
@@ -106,7 +106,7 @@ def run_train():
 
     start = timer()
     j = 0  # accum counter
-    i = 0  # iter  counter
+    i = 1  # iter  counter
 
     while i < cfg.num_iters:  # loop over the dataset multiple times
         sum_train_loss = np.zeros(6, np.float32)
