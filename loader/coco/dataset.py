@@ -91,6 +91,9 @@ def instance_to_box(instance):
     H, W = instance.shape[:2]
 
     y, x = np.where(instance)
+    if len(x) == 0 or len(y) == 0:
+        return [0., 0., 0., 0.]
+
     y0 = y.min()
     y1 = y.max()
     x0 = x.min()
