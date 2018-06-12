@@ -85,9 +85,13 @@ Modify `-arch` keyword for these 2 files according to your gpu's arch above
 ```
 coco2017
     ├── annotations
-    │   └── instances_train2017.json
+    │   ├── instances_train2017.json
+    │   └── instances_valid2017.json
+    │
     └── images
-        └── train2017
+        ├── train2017
+        │   └── *.jpg
+        └── valid2017
             └── *.jpg
 ```
   - Run `train.py`
