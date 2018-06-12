@@ -33,8 +33,13 @@ class CocoDataset(Dataset):
         for i, cls_id in enumerate(cls_ids):
             self.ids_lookup[cls_id] = i + 1
 
+        # index lookup
+        key_list = list(self.coco.imgs.keys())
+        self.idx_lookup = {i: key_list[i] for i in range(len(key_list))}
+
     def __getitem__(self, index):
-        imgIds = self.coco.getImgIds(imgIds=[index])
+        coco_index = self.idx_lookup[index]
+        imgIds = self.coco.getImgIds(imgIds=[coco_index])
         img_obj = self.coco.loadImgs(imgIds[0])[0]
 
         image_path = os.path.join(self.dataDir, 'images', self.dataType, img_obj['file_name'])
