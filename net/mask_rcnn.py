@@ -125,9 +125,9 @@ class MaskRcnnNet(nn.Module):
                               self.rcnn_cls_loss + self.rcnn_reg_loss + \
                               self.mask_cls_loss
         else:
-            self.rcnn_cls_loss = torch.tensor(0.0)
-            self.rcnn_reg_loss = torch.tensor(0.0)
-            self.mask_cls_loss = torch.tensor(0.0)
+            self.rcnn_cls_loss = torch.tensor(0.0).to(self.cfg.device)
+            self.rcnn_reg_loss = torch.tensor(0.0).to(self.cfg.device)
+            self.mask_cls_loss = torch.tensor(0.0).to(self.cfg.device)
             self.total_loss = self.rpn_cls_loss + self.rpn_reg_loss
 
         return self.total_loss

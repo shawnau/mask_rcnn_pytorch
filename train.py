@@ -69,10 +69,10 @@ def run_train():
         pin_memory=True,
         collate_fn=train_collate)
 
-    valid_dataset = CocoDataset(cfg, cfg.data_dir, dataType='valid2017', mode='train', transform=valid_augment)
+    valid_dataset = CocoDataset(cfg, cfg.data_dir, dataType='val2017', mode='train', transform=valid_augment)
     valid_loader = DataLoader(
         valid_dataset,
-        sampler=FixLengthRandomSampler(valid_dataset, length=20),
+        sampler=FixLengthRandomSampler(valid_dataset, length=cfg.batch_size),
         batch_size=cfg.batch_size,
         drop_last=False,
         num_workers=4,
