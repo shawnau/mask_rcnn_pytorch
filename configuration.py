@@ -75,3 +75,6 @@ class Configuration(object):
         self.iter_smooth = 1  # calculate smoothed loss over each 20 iter
         self.iter_valid = 100
         self.iter_save = 2000
+
+        # checkpoint
+        self.checkpoint = None

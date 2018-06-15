@@ -73,7 +73,7 @@ def make_one_mask_target(cfg, image, proposals, truth_box, truth_label, truth_in
                 sampled_instance.append(crop[np.newaxis, :, :])
 
         # save
-        sampled_instance = np.vstack(sampled_instance)
+        sampled_instance = np.vstack(sampled_instance) if len(sampled_instance) > 0 else np.zeros((0, cfg.mask_size, cfg.mask_size))
 
         sampled_proposal = to_tensor(sampled_proposal, cfg.device)
         sampled_label    = to_tensor(sampled_label, cfg.device)

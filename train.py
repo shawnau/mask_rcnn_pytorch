@@ -11,6 +11,7 @@ from net.mask_rcnn import MaskRcnnNet
 
 from loader.sampler import *
 from net.utils.file import Logger, time_to_str
+from net.utils.train_utils import adjust_learning_rate, get_learning_rate
 
 
 def validate(cfg, net, valid_loader):
@@ -56,6 +57,17 @@ def run_train():
 
     start_iter = 0
     start_epoch = 0.
+
+    if cfg.checkpoint is not None:
+        checkpoint = cfg.checkpoint
+        net.load_state_dict(torch.load(checkpoint, map_location=lambda storage, loc: storage))
+        checkpoint_optim = torch.load(checkpoint.replace('_model.pth', '_optimizer.pth'))
+        start_iter = checkpoint_optim['iter']
+        start_epoch = checkpoint_optim['epoch']
+
+        rate = get_learning_rate(optimizer)  # load all except learning rate
+        optimizer.load_state_dict(checkpoint_optim['optimizer'])
+        adjust_learning_rate(optimizer, rate)
 
     # dataset -------------------------------------------------
     log.write('** dataset setting **\n')
