@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 import cv2
+from skimage.transform import resize
 
 
 # <todo> mask crop should match align kernel (same wait to handle non-integer pixel location (e.g. 23.5, 32.1))
@@ -40,7 +41,8 @@ def resize_instance(instance, box, mask_size, threshold=0.5):
 
     #print(x0,y0,x1,y1)
     crop = instance[y0:y1+1,x0:x1+1]
-    crop = cv2.resize(crop, (mask_size, mask_size))
+    # crop = cv2.resize(crop, (mask_size, mask_size))
+    crop = resize(crop, (mask_size, mask_size))
     crop = (crop > threshold).astype(np.float32)
     return crop
 
