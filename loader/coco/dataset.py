@@ -29,6 +29,7 @@ class CocoDataset(Dataset):
 
         # class id re-hashing
         cls_ids = self.coco.getCatIds()
+        self.cls_names = [cat['name'] for cat in self.coco.loadCats(cls_ids)]
         self.ids_lookup = {}
         for i, cls_id in enumerate(cls_ids):
             self.ids_lookup[cls_id] = i + 1

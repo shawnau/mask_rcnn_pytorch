@@ -16,10 +16,15 @@ def draw_screen_rect(image, point1, point2, color, alpha=0.5):
     image[y1:y2,x1:x2,:] = (1-alpha)*image[y1:y2,x1:x2,:] + (alpha)*np.array(color, np.uint8)
 
 
-def draw_boxes(image, boxes, color=(0, 0, 255)):
-    for box in boxes:
+def draw_boxes(image, boxes, labels=None, scores=None, color=(0, 0, 255)):
+    for i in range(len(boxes)):
+        box = boxes[i]
         x0, y0, x1, y1 = int(box[0]), int(box[1]), int(box[2]), int(box[3])
         cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
+        if (labels is not None) and (scores is not None):
+            label = labels[i]
+            score = scores[i]
+            cv2.putText(image, "%s: %.2f" % (label, score), (x0, y0), 0, 0.3, (255, 0, 0))
 
 
 def draw_proposals(image, proposals, color=(0, 0, 255)):
@@ -31,7 +36,7 @@ def draw_proposals(image, proposals, color=(0, 0, 255)):
         score = proposals[i, 5]
         label = proposals[i, 6]
         cv2.rectangle(image, (x0, y0), (x1, y1), color, 1)
-        cv2.putText(image, "%.2f"%score, (x0, y0), 0, 0.3, (255, 0, 0))
+        cv2.putText(image, "%s: %.2f"%(label, score), (x0, y0), 0, 0.3, (255, 255, 255))
 
 
 def instances_to_color_overlay(instances, image=None, color=None):

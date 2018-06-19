@@ -79,6 +79,7 @@ Modify `-arch` keyword for these 2 files according to your gpu's arch above
  - Run  `train.py`
 
 2. Train MS COCO Detection 2017 Dataset
+ - Install coco PythonAPI: https://github.com/cocodataset/cocoapi
  - `git checkout coco`
  - Download coco dataset, put into `data/` with following structure:
 

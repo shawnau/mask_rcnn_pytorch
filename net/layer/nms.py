@@ -75,7 +75,7 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
             if len(select) == 0:
                 return torch.zeros((1, 7)).to(cfg.device)
             raw_box = rpn_proposals_np[select, 1:5]
-            prob_distrib = np_softmax(logits_np[select])  # <todo>why not use np_sigmoid?
+            prob_distrib = np_softmax(logits_np[select])
             delta_distrib = deltas_np[select]
 
         # skip background
@@ -125,8 +125,8 @@ def mask_nms(cfg, images, proposals, mask_logits):
     3. paste the masks into input image
     :param cfg:
     :param images: (B, C, H, W)
-    :param proposals: (B, 7) [i, x0, y0, x1, y1, score, label]
-    :param mask_logits: (B, num_classes, 2*crop_size, 2*crop_size)
+    :param proposals: (B_i*N_i, 7) [i, x0, y0, x1, y1, score, label]
+    :param mask_logits: (B_i*N_i, num_classes, 2*crop_size, 2*crop_size)
     :return:
         b_multi_masks: (B, H, W) masks labelled with 1,2,...N (total number of masks)
         b_mask_instances: (B*N, H, W) masks with prob

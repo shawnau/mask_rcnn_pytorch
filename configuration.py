@@ -14,11 +14,12 @@ class Configuration(object):
 
         # multi-rpn  --------------------------------------------------------
         # base size of the anchor box on input image
-        self.rpn_base_sizes = [32, 64, 128, 256]
-        self.rpn_scales = [4, 8, 16, 32]
+        self.rpn_base_sizes = [32, 64, 128, 256, 512]
+        self.rpn_scales = [4, 8, 16, 32, 64]
         # anchor aspects. please referring to the doc
         aspect = lambda s, r: (s * 1 / r ** 0.5, s * r ** 0.5)
         self.rpn_base_aspect_ratios = [
+           [(1, 1), aspect(2**0.5, 2), aspect(2**0.5, 0.5), ],
            [(1, 1), aspect(2**0.5, 2), aspect(2**0.5, 0.5), ],
            [(1, 1), aspect(2**0.5, 2), aspect(2**0.5, 0.5), ],
            [(1, 1), aspect(2**0.5, 2), aspect(2**0.5, 0.5), ],
@@ -68,13 +69,13 @@ class Configuration(object):
         self.mask_test_mask_min_area = 8
 
         # optim -----------------------------------------------------------------
-        self.lr = 0.01
+        self.lr = 0.001
         self.iter_accum = 1  # learning rate = lr/iter_accum
         self.batch_size = 1
-        self.num_iters = 10000
+        self.num_iters = int(100000 / self.batch_size * 50)
         self.iter_smooth = 1  # calculate smoothed loss over each 20 iter
         self.iter_valid = 100
-        self.iter_save = 2000
+        self.iter_save = self.num_iters / 10
 
         # checkpoint
         self.checkpoint = None

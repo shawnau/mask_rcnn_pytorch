@@ -119,6 +119,7 @@ class SEResNeXtFPN(nn.Module):
         self.layer_p4 = LateralBlock(1024)  # takes p5 and c4 (1024)
         self.layer_p3 = LateralBlock(512)
         self.layer_p2 = LateralBlock(256)
+        self.layer_p1 = LateralBlock(256)
 
     def forward(self, x):
         c1 = self.conv1(x)
@@ -128,9 +129,10 @@ class SEResNeXtFPN(nn.Module):
         c5 = self.conv5_x(c4)
 
         p5 = self.layer_p5(c5)
+        p6 = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)(p5)
         p4 = self.layer_p4(c4, p5)
         p3 = self.layer_p3(c3, p4)
         p2 = self.layer_p2(c2, p3)
 
-        features = [p2, p3, p4, p5]
+        features = [p2, p3, p4, p5, p6]
         return features

@@ -14,6 +14,8 @@ class RoiAlign(nn.Module):
         self.crop_size  = crop_size
         self.sizes      = cfg.rpn_base_sizes
         self.scales     = cfg.rpn_scales
+        assert self.num_scales == len(self.sizes)
+        assert self.num_scales == len(self.scales)
 
         self.crops = nn.ModuleList()
         for l in range(self.num_scales):
@@ -37,7 +39,7 @@ class RoiAlign(nn.Module):
         sizes = boxes[:, 2:]-boxes[:, :2]  # box sizes (w, h)
         sizes = torch.sqrt(sizes[:, 0]*sizes[:, 1])  # sqrt(wh)
         # compare box with 4 different base sizes
-        distances = torch.abs(sizes.view(num_proposals, 1).expand(num_proposals, 4) -
+        distances = torch.abs(sizes.view(num_proposals, 1).expand(num_proposals, self.num_scales) -
                               torch.from_numpy(np.array(self.sizes, np.float32)).to(self.cfg.device))
         #     sizes: 8, 16, 32, 64
         # distances: 1,  3,  3,  7 (min_index=0, pool from fs[0]=p2)

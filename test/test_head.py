@@ -36,7 +36,7 @@ class TestBackbone(unittest.TestCase):
 
     def setUp(self):
         # batch_size=5, channel=3, height=256, width=256
-        self.input_tensor = torch.randn(5, 3, 256, 256)
+        self.input_tensor = torch.randn(5, 3, 512, 512)
         print('=' * 10 + 'Test Backbone' + '=' * 10)
         self.net = SEResNeXtFPN([3, 4, 6, 3])
 
@@ -56,7 +56,8 @@ class TestRPNHead(unittest.TestCase):
         p3 = torch.randn(5, 256, 64, 64)
         p4 = torch.randn(5, 256, 32, 32)
         p5 = torch.randn(5, 256, 16, 16)
-        self.fs = [p2, p3, p4, p5]
+        p6 = torch.randn(5, 256, 8, 8)
+        self.fs = [p2, p3, p4, p5, p6]
         print('=' * 10 + 'Test RPN Head' + '=' * 10)
         self.net = RpnMultiHead(self.cfg, 256)
 
@@ -64,7 +65,8 @@ class TestRPNHead(unittest.TestCase):
             len(self.cfg.rpn_base_aspect_ratios[0]) * 128 * 128 + \
             len(self.cfg.rpn_base_aspect_ratios[1]) * 64 * 64 + \
             len(self.cfg.rpn_base_aspect_ratios[2]) * 32 * 32 + \
-            len(self.cfg.rpn_base_aspect_ratios[3]) * 16 * 16
+            len(self.cfg.rpn_base_aspect_ratios[3]) * 16 * 16 + \
+            len(self.cfg.rpn_base_aspect_ratios[4]) * 8 * 8
 
     def test_forward(self):
         logits_flat, deltas_flat = self.net(self.fs)
@@ -96,7 +98,8 @@ class TestROIAlign(unittest.TestCase):
         p3 = torch.randn(5, 256, 64, 64)
         p4 = torch.randn(5, 256, 32, 32)
         p5 = torch.randn(5, 256, 16, 16)
-        self.fs = [p2, p3, p4, p5]
+        p6 = torch.randn(5, 256, 8, 8)
+        self.fs = [p2, p3, p4, p5, p6]
         print('=' * 10 + 'Test ROI Align' + '=' * 10)
         self.net = RoiAlign(self.cfg, self.cfg.rcnn_crop_size)
 
