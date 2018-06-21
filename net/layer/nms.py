@@ -33,19 +33,19 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
                [[0.7, 0.5], ...]
     :param deltas_np: (B, N, 2, 4)
                [[[t1, t2, t3, t4], [t1, t2, t3, t4]], ...]
-    :return: all proposals in a batch. e.g.
+    :return: all rpn_proposals in a batch. e.g.
         [i, x0, y0, x1, y1, score, label]
-        proposals[0]:   image idx in the batch
-        proposals[1:5]: bbox
-        proposals[5]:   probability of foreground (background skipped)
-        proposals[6]:   class label, 1 fore foreground, 0 for background, here we only return 1
+        rpn_proposals[0]:   image idx in the batch
+        rpn_proposals[1:5]: bbox
+        rpn_proposals[5]:   probability of foreground (background skipped)
+        rpn_proposals[6]:   class label, 1 fore foreground, 0 for background, here we only return 1
     """
-    if mode in ['train']:
+    if mode in ['train_rpn', 'train_rcnn', 'train_all']:
         nms_prob_threshold = cfg.rpn_train_nms_pre_score_threshold if head == 'rpn' else cfg.rcnn_train_nms_pre_score_threshold
         nms_overlap_threshold = cfg.rpn_train_nms_overlap_threshold if head == 'rpn' else cfg.rcnn_train_nms_overlap_threshold
         nms_min_size = cfg.rpn_train_nms_min_size if head == 'rpn' else cfg.rcnn_train_nms_min_size
 
-    elif mode in ['valid', 'test', 'eval']:
+    elif mode in ['valid_rpn', 'valid_rcnn', 'valid_all', 'test', 'eval']:
         nms_prob_threshold = cfg.rpn_test_nms_pre_score_threshold if head == 'rpn' else cfg.rcnn_test_nms_pre_score_threshold
         nms_overlap_threshold = cfg.rpn_test_nms_overlap_threshold if head == 'rpn' else cfg.rcnn_test_nms_overlap_threshold
         nms_min_size = cfg.rpn_test_nms_min_size if head == 'rpn' else cfg.rcnn_test_nms_min_size
@@ -53,7 +53,7 @@ def _nms(cfg, mode, head, decode, images, logits, deltas, anchor_boxes=None, rpn
         if mode in ['eval']:
             nms_prob_threshold = 0.05  # set low numbe r to make roc curve.
     else:
-        raise ValueError('rpn_nms(): invalid mode = %s?' % mode)
+        raise ValueError('nms: invalid mode = %s?' % mode)
 
     num_classes = 2 if head == 'rpn' else cfg.num_classes
     logits_np = logits.detach().cpu().numpy()
@@ -130,7 +130,7 @@ def mask_nms(cfg, images, proposals, mask_logits):
     :return:
         b_multi_masks: (B, H, W) masks labelled with 1,2,...N (total number of masks)
         b_mask_instances: (B*N, H, W) masks with prob
-        b_mask_proposals: (B*N, ) proposals
+        b_mask_proposals: (B*N, ) rpn_proposals
     """
     overlap_threshold   = cfg.mask_test_nms_overlap_threshold
     pre_score_threshold = cfg.mask_test_nms_pre_score_threshold
@@ -207,7 +207,7 @@ def mask_nms(cfg, images, proposals, mask_logits):
                 keep.append(i)
                 delete_index = list(np.where(instance_overlap[i] > overlap_threshold)[0])
                 sort_idx = [e for e in sort_idx if e not in delete_index]
-            # filter instances & proposals
+            # filter instances & rpn_proposals
             num_keeps = len(keep)
             for i in range(num_keeps):
                 k = keep[i]

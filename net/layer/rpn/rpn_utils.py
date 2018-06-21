@@ -31,7 +31,7 @@ def rpn_decode(window, delta):
 def rpn_make_anchor_boxes(fs, cfg):
     """
     :param: fs: [4*(B, C, H, W)] a batch of features
-    create region proposals from all 4 feature maps from FPN
+    create region rpn_proposals from all 4 feature maps from FPN
     a total of (128*128*3 + 64*64*3 + 32*32*3 + 16*16*3) boxes
     """
 

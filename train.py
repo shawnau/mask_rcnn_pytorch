@@ -14,31 +14,6 @@ from net.utils.file import Logger, time_to_str
 from net.utils.train_utils import adjust_learning_rate, get_learning_rate
 
 
-def validate(cfg, net, valid_loader):
-    test_num = 0
-    valid_loss = np.zeros(6, np.float32)
-
-    for inputs, truth_boxes, truth_labels, truth_instances, indices in valid_loader:
-        with torch.no_grad():
-            net(inputs.to(cfg.device), truth_boxes, truth_labels, truth_instances)
-            loss = net.loss()
-
-        batch_size = len(indices)
-        valid_loss += batch_size * np.array((
-            loss.cpu().data.numpy(),
-            net.rpn_cls_loss.cpu().data.numpy(),
-            net.rpn_reg_loss.cpu().data.numpy(),
-            net.rcnn_cls_loss.cpu().data.numpy() if net.rcnn_cls_loss else 0.0,
-            net.rcnn_reg_loss.cpu().data.numpy() if net.rcnn_reg_loss else 0.0,
-            net.mask_cls_loss.cpu().data.numpy() if net.mask_cls_loss else 0.0,
-        ))
-        test_num += batch_size
-
-    assert (test_num == len(valid_loader.sampler))
-    valid_loss = valid_loss / test_num
-    return valid_loss
-
-
 class TrainClass:
     def __init__(self):
         self.cfg = Configuration()
@@ -46,6 +21,7 @@ class TrainClass:
         self.log.open(os.path.join('log.train.txt'), mode='a')
         # net -------------------------------------------------
         self.log.write('** net setting **\n')
+        self.mode = 'train_all'
         self.net = MaskRcnnNet(self.cfg).to(self.cfg.device)
 
         self.optimizer = optim.SGD(filter(lambda p: p.requires_grad, self.net.parameters()),
@@ -54,12 +30,13 @@ class TrainClass:
                                    weight_decay=0.0001
                                    )
 
-        self.start_iter = 0
+        self.start_iter = 1
         self.start_epoch = 0.
         self.rate = 0
 
         if self.cfg.checkpoint:
             self.load_checkpoint(self.cfg.checkpoint)
+
         self.init_dataloader()
 
     def load_checkpoint(self, checkpoint):
@@ -71,6 +48,17 @@ class TrainClass:
         self.rate = get_learning_rate(self.optimizer)  # load all except learning rate
         self.optimizer.load_state_dict(checkpoint_optim['optimizer'])
         adjust_learning_rate(self.optimizer, self.rate)
+
+    def save_checkpoint(self, i, epoch):
+        model_path = os.path.join('%08d_model.pth' % i)
+        optimizer_path = os.path.join('%08d_optimizer.pth' % i)
+
+        torch.save(self.net.state_dict(), model_path)
+        torch.save({
+            'optimizer': self.optimizer.state_dict(),
+            'iter': i,
+            'epoch': epoch,
+        }, optimizer_path)
 
     def init_dataloader(self):
         self.log.write('** dataset setting **\n')
@@ -101,6 +89,43 @@ class TrainClass:
         self.log.write('\tbatch_size  = %d\n' % self.cfg.batch_size)
         self.log.write('\n')
 
+    def get_loss(self):
+
+        rpn_cls_loss = self.net.rpn_cls_loss.detach().cpu().numpy() if self.net.rpn_cls_loss else 0.0
+        rpn_reg_loss = self.net.rpn_reg_loss.detach().cpu().numpy() if self.net.rpn_reg_loss else 0.0
+        rcnn_cls_loss = self.net.rcnn_cls_loss.detach().cpu().numpy() if self.net.rcnn_cls_loss else 0.0
+        rcnn_reg_loss = self.net.rcnn_reg_loss.detach().cpu().numpy() if self.net.rcnn_reg_loss else 0.0
+        mask_cls_loss = self.net.mask_cls_loss.detach().cpu().numpy() if self.net.mask_cls_loss else 0.0
+        loss = rpn_cls_loss + rpn_reg_loss + rcnn_cls_loss + rcnn_reg_loss + mask_cls_loss
+
+        return np.array((
+            loss,
+            rpn_cls_loss,
+            rpn_reg_loss,
+            rcnn_cls_loss,
+            rcnn_reg_loss,
+            mask_cls_loss,
+        ))
+
+    def validate(self):
+        self.net.set_mode(self.mode.replace('train', 'valid'))
+
+        test_num = 0
+        valid_loss = np.zeros(6, np.float32)
+        for inputs, truth_boxes, truth_labels, truth_instances, indices in self.valid_loader:
+            with torch.no_grad():
+                self.net.loss(inputs.to(self.cfg.device), truth_boxes, truth_labels, truth_instances)
+
+            batch_size = len(indices)
+            valid_loss += batch_size * self.get_loss()
+            test_num += batch_size
+
+        assert (test_num == len(self.valid_loader.sampler))
+
+        self.net.set_mode(self.mode)
+        valid_loss = valid_loss / test_num
+        return valid_loss
+
     def train(self):
         train_loss = np.zeros(6, np.float32)
         valid_loss = np.zeros(6, np.float32)
@@ -108,7 +133,7 @@ class TrainClass:
 
         start = timer()
         j = 0  # accum counter
-        i = 1  # iter  counter
+        i = 0  # iter  counter
 
         self.log.write(
             ' rate    iter   epoch  num   | valid    rpnc rpnr    rcnnc rcnnr    mask | train   rpnc rpnr     rcnnc rcnnr    mask | batch   rpnc rpnr     rcnnc rcnnr    mask |  time\n')
@@ -120,7 +145,7 @@ class TrainClass:
             sum_train_acc = 0.0
             batch_sum = 0
 
-            self.net.set_mode('train')
+            self.net.set_mode(self.mode)
             self.optimizer.zero_grad()
 
             for inputs, truth_boxes, truth_labels, truth_instances, indices in self.train_loader:
@@ -132,10 +157,7 @@ class TrainClass:
                 num_products = epoch * len(self.train_dataset)
                 # validate iter -------------------------------------------------
                 if i % self.cfg.iter_valid == 0:
-                    self.net.set_mode('valid')
-                    valid_loss = validate(self.cfg, self.net, self.valid_loader)
-                    self.net.set_mode('train')
-
+                    valid_loss = self.validate()
                     print('\r', end='', flush=True)
                     self.log.write(
                         '%0.4f %5.1f k %6.1f %4.1f m | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %0.3f   %0.3f %0.3f   %0.3f %0.3f   %0.3f | %s\n' % (
@@ -145,21 +167,13 @@ class TrainClass:
                             batch_loss[0], batch_loss[1], batch_loss[2], batch_loss[3], batch_loss[4], batch_loss[5],
                             time_to_str((timer() - start) / 60)))
                     time.sleep(0.01)
-                # save checkpoint_dir -------------------------------------------------
-                if i % self.cfg.iter_save == 0:
-                    model_path = os.path.join('%08d_model.pth' % i)
-                    optimizer_path = os.path.join('%08d_optimizer.pth' % i)
 
-                    torch.save(self.net.state_dict(), model_path)
-                    torch.save({
-                        'optimizer': self.optimizer.state_dict(),
-                        'iter': i,
-                        'epoch': epoch,
-                    }, optimizer_path)
+                # save checkpoint -------------------------------------------------
+                if i % self.cfg.iter_save == 0:
+                    self.save_checkpoint(i, epoch)
 
                 # one iteration update  -------------------------------------------------
-                self.net(inputs.to(self.cfg.device), truth_boxes, truth_labels, truth_instances)
-                loss = self.net.loss()
+                loss = self.net.loss(inputs.to(self.cfg.device), truth_boxes, truth_labels, truth_instances)
                 loss.backward()
 
                 if j % self.cfg.iter_accum == 0:
@@ -169,14 +183,7 @@ class TrainClass:
 
                 # print statistics  -------------------------------------------------
                 batch_acc = 0
-                batch_loss = np.array((
-                    loss.cpu().data.numpy(),
-                    self.net.rpn_cls_loss.cpu().data.numpy(),
-                    self.net.rpn_reg_loss.cpu().data.numpy(),
-                    self.net.rcnn_cls_loss.cpu().data.numpy(),
-                    self.net.rcnn_reg_loss.cpu().data.numpy(),
-                    self.net.mask_cls_loss.cpu().data.numpy(),
-                ))
+                batch_loss = self.get_loss()
                 sum_train_loss += batch_loss
                 sum_train_acc += batch_acc
                 batch_sum += 1
@@ -203,21 +210,16 @@ class TrainClass:
 if __name__ == '__main__':
     # train rpn head
     t = TrainClass()
-    for layer in [t.net.rcnn_crop, t.net.rcnn_head, t.net.mask_crop, t.net.mask_head]:
-        for param in layer.parameters():
-            param.requires_grad = False
+    print('train RPN head')
+    t.mode = 'train_rpn'
     t.train()
 
-    # train rcnn head
-    for layer in [t.net.rcnn_crop, t.net.rcnn_head]:
-        for param in layer.parameters():
-            param.requires_grad = True
+    print('train RCNN head')
+    t.mode = 'train_rcnn'
     t.train()
 
-    # train all
-    for layer in [t.net.mask_crop, t.net.mask_head]:
-        for param in layer.parameters():
-            param.requires_grad = True
+    print('train all heads')
+    t.mode = 'train_all'
     t.train()
 
     print('\nsucess!')

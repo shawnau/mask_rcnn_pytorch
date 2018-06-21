@@ -45,7 +45,7 @@ class TestNms(unittest.TestCase):
         p4 = torch.randn(5, 256, 32, 32)
         p5 = torch.randn(5, 256, 16, 16)
         self.fs = [p2, p3, p4, p5]
-        # proposals
+        # rpn_proposals
         rpn_proposals = np.array(
             [[0., 52.,  161., 70.,  176., 0.6, 1.],
              [0., 148., 190., 176., 215., 0.7, 1.],
@@ -126,7 +126,7 @@ class TestNms(unittest.TestCase):
             print('b_mask_proposals: ', b_mask_proposals.size())
 
     def test_empty_mask(self):
-        print('test mask nms_func for empty rcnn proposals')
+        print('test mask nms_func for empty rcnn rpn_proposals')
         roi_align = RoiAlign(self.cfg, self.cfg.rcnn_crop_size)
 
         empty_proposal = torch.zeros((1, 7))

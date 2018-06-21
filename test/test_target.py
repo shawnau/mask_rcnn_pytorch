@@ -48,7 +48,7 @@ class TestTarget(unittest.TestCase):
         p4 = torch.randn(self.cfg.batch_size, 256, 32, 32)
         p5 = torch.randn(self.cfg.batch_size, 256, 16, 16)
         self.fs = [p2, p3, p4, p5]
-        # proposals
+        # rpn_proposals
         rpn_proposals = np.array(
             [[0., 52., 161., 70., 176., 0.6, 1.],
              [0., 148., 190., 176., 215., 0.7, 1.],

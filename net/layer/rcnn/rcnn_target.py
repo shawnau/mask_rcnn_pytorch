@@ -9,7 +9,7 @@ from net.layer.rcnn.rcnn_utils import rcnn_encode
 
 def add_truth_box_to_proposal(proposal, img_idx, truth_box, truth_label, score=-1):
     """
-    :param proposal: proposals fot ONE IMAGE. e.g.
+    :param proposal: rpn_proposals fot ONE IMAGE. e.g.
         [i, x0, y0, x1, y1, score, label]
     :param img_idx: image index in the batch
     :param truth_box:
@@ -32,12 +32,12 @@ def add_truth_box_to_proposal(proposal, img_idx, truth_box, truth_label, score=-
 def balance(fg_index, bg_index, batch_size, fg_ratio, num_proposal):
     """
     balance foreground and background fraction
-    will generate duplicated proposals if proposals < rcnn batch size
+    will generate duplicated rpn_proposals if rpn_proposals < rcnn batch size
     :param fg_index: foreground indices
     :param bg_index: background indices
     :param batch_size: rcnn train batch size
     :param fg_ratio: rcnn train foreground ratio
-    :param num_proposal: number of rcnn proposals
+    :param num_proposal: number of rcnn rpn_proposals
     :return:
     """
     num_fg = int(np.round(fg_ratio * batch_size))
@@ -85,7 +85,7 @@ def make_one_rcnn_target(cfg, proposals, truth_boxes, truth_labels):
     sampled_assign   = np.zeros((0, ), np.int32)
     sampled_target   = torch.zeros((0, 4), dtype=torch.float32).to(cfg.device)
 
-    # filter invalid proposals
+    # filter invalid rpn_proposals
     num_proposal = len(proposals)
     valid = []
     for i in range(num_proposal):
@@ -136,7 +136,7 @@ def make_one_rcnn_target(cfg, proposals, truth_boxes, truth_labels):
 
 def make_rcnn_target(cfg, images, rpn_proposals, truth_boxes, truth_labels):
     """
-    a sampled subset of proposals, with it's_train corresponding truth label and offsets
+    a sampled subset of rpn_proposals, with it's_train corresponding truth label and offsets
     :param images: (B, 3, H, W), BGR mode
     :param rpn_proposals_np: (B, 7), [i, x0, y0, x1, y1, score, label], B > 0
     :param truth_boxes: (B, _, 4)

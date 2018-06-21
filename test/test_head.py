@@ -119,7 +119,7 @@ class TestROIAlign(unittest.TestCase):
     def test_empty(self):
         empty = torch.zeros((1, 7))
         crops = self.net(self.fs, empty)
-        print("Cropped zero proposals: ", crops.size())
+        print("Cropped zero rpn_proposals: ", crops.size())
 
 
 class TestRCNNHead(unittest.TestCase):

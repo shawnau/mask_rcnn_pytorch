@@ -64,7 +64,7 @@ class RpnMultiHead(nn.Module):
             db = background deltas
             in which df, db = [cx, cy, w, h]
 
-            a total of N = (16*16*3 + 32*32*3 + 64*64*3 + 128*128*3) = 65280 proposals in an input
+            a total of N = (16*16*3 + 32*32*3 + 64*64*3 + 128*128*3) = 65280 rpn_proposals in an input
         """
         batch_size = len(fs[0])
 

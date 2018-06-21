@@ -42,7 +42,7 @@ class Configuration(object):
 
         # rcnn ------------------------------------------------------------------
         self.rcnn_crop_size         = 14  # roi align pooling size
-        self.rcnn_train_batch_size  = 32  # rcnn proposals for training per image
+        self.rcnn_train_batch_size  = 32  # rcnn rpn_proposals for training per image
         self.rcnn_train_fg_fraction = 0.5     # foreground fraction for training
         self.rcnn_train_fg_thresh_low  = 0.5  # 0.5 < overlap < 1.0 as foreground
         self.rcnn_train_bg_thresh_high = 0.5  # thresh_low < overlap < thresh_high as background
@@ -58,7 +58,7 @@ class Configuration(object):
 
         # mask ------------------------------------------------------------------
         self.mask_crop_size            = 14  # input of mask head
-        self.mask_train_batch_size     = 32  # mask proposals for training per image
+        self.mask_train_batch_size     = 32  # mask rpn_proposals for training per image
         self.mask_size                 = 28  # output size of mask head
         self.mask_train_min_size       = 8
         self.mask_train_fg_thresh_low  = self.rpn_train_fg_thresh_low

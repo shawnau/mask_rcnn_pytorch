@@ -64,10 +64,10 @@ def clip_boxes(boxes, width, height):
     """
     Clip process to image boundaries.
     Used in rpn_nms and rcnn_nms
-    :param boxes: proposals
+    :param boxes: rpn_proposals
     :param width: input's_train width
     :param height: input's_train height
-    :return: cropped proposals to fit input's_train border
+    :return: cropped rpn_proposals to fit input's_train border
     """
     boxes[:, 0] = np.clip(boxes[:, 0], 0, width - 1)
     boxes[:, 1] = np.clip(boxes[:, 1], 0, height - 1)

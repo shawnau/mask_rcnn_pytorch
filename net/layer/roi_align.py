@@ -53,7 +53,7 @@ class RoiAlign(nn.Module):
             index = (min_index == l).nonzero()
             if len(index) > 0:
                 crop = self.crops[l](fs[l], rois[index].view(-1, 5))
-                # crop = self.crops[l](fs[l], proposals[index].view(-1, 8))
+                # crop = self.crops[l](fs[l], rpn_proposals[index].view(-1, 8))
                 crops.append(crop)
                 indices.append(index)
         # re-arrange crops by box order
