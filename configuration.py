@@ -31,13 +31,13 @@ class Configuration(object):
         self.rpn_train_fg_thresh_low  = 0.5
 
         # select anchor boxes with
-        # score > 0.5, overlap > 0.85 , size > 5 pixel^2 as nms output for training
-        self.rpn_train_nms_pre_score_threshold = 0.70
-        self.rpn_train_nms_overlap_threshold   = 0.85
+        # score > 0.5, overlap < 0.7 , size > 5 pixel^2 as nms output for training
+        self.rpn_train_nms_pre_score_threshold = 0.7
+        self.rpn_train_nms_overlap_threshold   = 0.7
         self.rpn_train_nms_min_size = 5
         # same as training
-        self.rpn_test_nms_pre_score_threshold = 0.70
-        self.rpn_test_nms_overlap_threshold   = 0.85
+        self.rpn_test_nms_pre_score_threshold = 0.7
+        self.rpn_test_nms_overlap_threshold   = 0.7
         self.rpn_test_nms_min_size = 5
 
         # rcnn ------------------------------------------------------------------
@@ -48,12 +48,12 @@ class Configuration(object):
         self.rcnn_train_bg_thresh_high = 0.5  # thresh_low < overlap < thresh_high as background
         self.rcnn_train_bg_thresh_low  = 0.0  # same as above
         # same as rpn
-        self.rcnn_train_nms_pre_score_threshold = 0.05
-        self.rcnn_train_nms_overlap_threshold   = 0.85
+        self.rcnn_train_nms_pre_score_threshold = 0.7
+        self.rcnn_train_nms_overlap_threshold   = 0.7
         self.rcnn_train_nms_min_size = 8
 
-        self.rcnn_test_nms_pre_score_threshold = 0.70
-        self.rcnn_test_nms_overlap_threshold   = 0.85
+        self.rcnn_test_nms_pre_score_threshold = 0.7
+        self.rcnn_test_nms_overlap_threshold   = 0.7
         self.rcnn_test_nms_min_size = 8
 
         # mask ------------------------------------------------------------------
@@ -71,11 +71,12 @@ class Configuration(object):
         # optim -----------------------------------------------------------------
         self.lr = 0.001
         self.iter_accum = 1  # learning rate = lr/iter_accum
-        self.batch_size = 1
-        self.num_iters = int(100000 / self.batch_size * 50)
+        self.batch_size = 2
+        self.num_epoch = 10
+        self.num_iters = int(100000 / self.batch_size * self.num_epoch)
         self.iter_smooth = 1  # calculate smoothed loss over each 20 iter
         self.iter_valid = 100
-        self.iter_save = self.num_iters / 10
+        self.iter_save = self.num_epoch
 
         # checkpoint
         self.checkpoint = None

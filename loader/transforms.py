@@ -5,68 +5,6 @@ import cv2
 import skimage
 
 
-# geometric ---
-def pad_to_factor(image, factor=16):
-    """
-    padding image to make 16 being its factor
-    :param image:
-    :param factor:
-    :return:
-    """
-    height, width = image.shape[:2]
-    h = math.ceil(height / factor) * factor
-    w = math.ceil(width / factor) * factor
-
-    image = cv2.copyMakeBorder(image,
-                               top=0,
-                               bottom=h - height,
-                               left=0, right=w - width,
-                               borderType=cv2.BORDER_REFLECT101,
-                               value=[0, 0, 0])
-    return image
-
-
-def pad_to_size(image, mask, width, height):
-    """
-    padding image to specified size
-    :param image:
-    :return:
-    """
-    img_height, img_width = image.shape[:2]
-    assert height > img_height
-    assert width > img_width
-    delta_w = width - img_width
-    delta_h = height - img_height
-    top, bottom = delta_h // 2, delta_h - (delta_h // 2)
-    left, right = delta_w // 2, delta_w - (delta_w // 2)
-
-    image = cv2.copyMakeBorder(image, top, bottom, left, right,
-                               borderType=cv2.BORDER_CONSTANT,
-                               value=[0, 0, 0])
-    mask  = cv2.copyMakeBorder(mask, top, bottom, left, right,
-                               borderType=cv2.BORDER_CONSTANT,
-                               value=[0, 0, 0])
-    return image, mask
-
-
-def resize_to_factor(image, mask, factor=16):
-    H, W = image.shape[:2]
-    h = (H // factor) * factor
-    w = (W // factor) * factor
-    return fix_resize_transform(image, mask, w, h)
-
-
-def fix_resize_transform(image, mask, w, h):
-    H, W = image.shape[:2]
-    if (H, W) != (h, w):
-        image = cv2.resize(image, (w, h))
-
-        mask = mask.astype(np.float32)
-        mask = cv2.resize(mask, (w, h), cv2.INTER_NEAREST)
-        mask = mask.astype(np.int32)
-    return image, mask
-
-
 def fix_crop_transform(image, mask, x, y, w, h):
     """
     (x,   y)--------(x+w,   y)

@@ -3,8 +3,8 @@ import cv2
 import torch
 from torch.utils.data.dataset import Dataset
 from pycocotools.coco import COCO
-
 import numpy as np
+from skimage.transform import resize, rescale
 
 
 class CocoDataset(Dataset):
@@ -118,60 +118,102 @@ def instance_to_box(instance):
     return [x0, y0, x1, y1]
 
 
+def resize_image(image, min_dim=None, max_dim=None, padding=True):
+    """
+    Resizes an image keeping the aspect ratio.
+
+    min_dim: if provided, resizes the image such that it's smaller
+        dimension == min_dim
+    max_dim: if provided, ensures that the image longest side doesn't
+        exceed this value.
+    padding: If true, pads image with zeros so it's size is max_dim x max_dim
+
+    Returns:
+    image: the resized image
+    window: (y1, x1, y2, x2). If max_dim is provided, padding might
+        be inserted in the returned image. If so, this window is the
+        coordinates of the image part of the full image (excluding
+        the padding). The x2, y2 pixels are not included.
+    scale: The scale factor used to resize the image
+    padding: Padding added to the image [(top, bottom), (left, right), (0, 0)]
+    """
+    # Default window (y1, x1, y2, x2) and default scale == 1.
+    h, w = image.shape[:2]
+    window = (0, 0, h, w)
+    scale = 1
+
+    # Scale?
+    if min_dim:
+        # Scale up but not down
+        scale = max(1, min_dim / min(h, w))
+    # Does it exceed max dim?
+    if max_dim:
+        image_max = max(h, w)
+        if round(image_max * scale) > max_dim:
+            scale = max_dim / image_max
+    # Resize image and mask
+    if scale != 1:
+        image = resize(image, (round(h * scale), round(w * scale)), mode='constant')
+    # Need padding?
+    if padding:
+        # Get new height and width
+        h, w = image.shape[:2]
+        top_pad = (max_dim - h) // 2
+        bottom_pad = max_dim - h - top_pad
+        left_pad = (max_dim - w) // 2
+        right_pad = max_dim - w - left_pad
+        padding = [(top_pad, bottom_pad), (left_pad, right_pad), (0, 0)]
+        image = np.pad(image, padding, mode='constant', constant_values=0)
+        window = (top_pad, left_pad, h + top_pad, w + left_pad)
+    return image, window, scale, padding
+
+
+def resize_mask(mask, scale, padding):
+    """Resizes a mask using the given scale and padding.
+    Typically, you get the scale and padding from resize_image() to
+    ensure both, the image and the mask, are resized consistently.
+
+    scale: mask scaling factor
+    padding: Padding to add to the mask in the form
+            [(top, bottom), (left, right), (0, 0)]
+    """
+    h, w = mask.shape[:2]
+    mask = rescale(mask, scale, mode='constant')
+    mask = np.pad(mask, padding[:2], mode='constant', constant_values=0)
+    return mask
+
+
 def train_augment(image, instances, labels, index):
-    WIDTH, HEIGHT = 512, 512
+    IMAGE_MIN_DIM = 512
+    IMAGE_MAX_DIM = 512
 
-    img_height, img_width = image.shape[:2]
-    if (img_height, img_width) != (HEIGHT, WIDTH):
-        image = cv2.resize(image, (WIDTH, HEIGHT))
-        ret_instances = []
-        boxes = []
-        for instance in instances:
-            instance = instance.astype(np.float32)
-            instance = cv2.resize(instance, (WIDTH, HEIGHT), cv2.INTER_NEAREST)
-            instance = instance.astype(np.int32)
-            ret_instances.append(instance)
-            boxes.append(instance_to_box(instance))
-    else:
-        ret_instances = instances
-        boxes = [instance_to_box(instance) for instance in instances]
+    image, window, scale, padding = resize_image(
+        image,
+        min_dim=IMAGE_MIN_DIM,
+        max_dim=IMAGE_MAX_DIM,
+        padding=True)
 
-    # image read from opencv has the dimension of (Height, Width, Channels)
-    input_image = torch.from_numpy(image.transpose((2, 0, 1))).float().div(255)
+    ret_instances = []
+    boxes = []
+    for instance in instances:
+        instance = instance.astype(np.float32)
+        instance = resize_mask(instance, scale, padding)
+        ret_instances.append(instance)
+        boxes.append(instance_to_box(instance))
+
+    # image read from opencv has the dimension of (Height, Width, Channels).
+    # image resized from skimage will div 255 automatically
+    input_image = torch.from_numpy(image.transpose((2, 0, 1))).float()
 
     assert len(instances) == len(labels)
-    ret_instances = np.array(ret_instances)
     labels = np.array(labels)
+    ret_instances = np.array(ret_instances).astype(np.float32)
     boxes = np.array(boxes).astype(np.float32)
     return input_image, boxes, labels, ret_instances, index
 
 
 def valid_augment(image, instances, labels, index):
-    WIDTH, HEIGHT = 512, 512
-
-    img_height, img_width = image.shape[:2]
-    if (img_height, img_width) != (HEIGHT, WIDTH):
-        image = cv2.resize(image, (WIDTH, HEIGHT))
-        ret_instances = []
-        boxes = []
-        for instance in instances:
-            instance = instance.astype(np.float32)
-            instance = cv2.resize(instance, (WIDTH, HEIGHT), cv2.INTER_NEAREST)
-            instance = instance.astype(np.int32)
-            ret_instances.append(instance)
-            boxes.append(instance_to_box(instance))
-    else:
-        ret_instances = instances
-        boxes = [instance_to_box(instance) for instance in instances]
-
-    # image read from opencv has the dimension of (Height, Width, Channels)
-    input_image = torch.from_numpy(image.transpose((2, 0, 1))).float().div(255)
-
-    assert len(instances) == len(labels)
-    ret_instances = np.array(ret_instances)
-    labels = np.array(labels)
-    boxes = np.array(boxes).astype(np.float32)
-    return input_image, boxes, labels, ret_instances, index
+    return train_augment(image, instances, labels, index)
 
 
 def train_collate(batch):

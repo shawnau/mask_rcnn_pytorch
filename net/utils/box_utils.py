@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-import cv2
 from skimage.transform import resize
+import cv2
 
 
 # <todo> mask crop should match align kernel (same wait to handle non-integer pixel location (e.g. 23.5, 32.1))
