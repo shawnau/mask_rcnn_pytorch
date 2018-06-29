@@ -137,5 +137,6 @@ net
 
 ## Difference from the original paper
 
-1. We use the idea of [UnitBox](https://arxiv.org/abs/1608.01471) for rpn anchor box regression.
-2. Training code resizes all the images into `512*512`, which could be improved.
+1. We use SE-ResNeXt-50 as backbone model
+2. We use the idea of [UnitBox](https://arxiv.org/abs/1608.01471) for rpn anchor box regression.
+3. Training code resizes all the images into `512*512`, which could be improved.
