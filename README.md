@@ -1,5 +1,12 @@
 
-> the pretrained model on coco dataset is under way. branch coco is not stable yet
+> the pretrained model on coco dataset is under way. branch coco is not stable yet. since the coco branch is not stable enough it serves as educational purpose for now :s
+
+TL;DR:
+ - Demo is under `demo.ipynb`
+ - Doc is under `doc/mask-rcnn-intro.ipynb`
+ - Configurations -> `configuration.py`
+ - `test` to play with those network headers
+
 
 # Mask RCNN PyTorch
 PyTorch 0.4 implementation of Mask-RCNN. This was the side-project of our work in [Kaggle Data Science Bowl 2018](https://github.com/shawnau/DataScienceBowl2018)
