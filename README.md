@@ -1,4 +1,6 @@
 
+> the pretrained model on coco dataset is under way. branch coco is not stable yet
+
 # Mask RCNN PyTorch
 PyTorch 0.4 implementation of Mask-RCNN. This was the side-project of our work in [Kaggle Data Science Bowl 2018](https://github.com/shawnau/DataScienceBowl2018)
 
