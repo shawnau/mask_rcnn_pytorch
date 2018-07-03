@@ -125,7 +125,7 @@ def make_mask_target(cfg, images, rcnn_proposals, truth_boxes, truth_labels, tru
             else:
                 proposal = rcnn_proposals_np[rcnn_proposals_np[:, 0] == b]
 
-            proposal = add_truth_box_to_proposal(proposal, b, truth_box, truth_label)
+            #proposal = add_truth_box_to_proposal(proposal, b, truth_box, truth_label)
 
             sampled_proposal, sampled_label, sampled_instance = \
                 make_one_mask_target(cfg, image, proposal, truth_box, truth_label, truth_instance)

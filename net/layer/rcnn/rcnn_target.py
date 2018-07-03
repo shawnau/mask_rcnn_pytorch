@@ -162,7 +162,7 @@ def make_rcnn_target(cfg, images, rpn_proposals, truth_boxes, truth_labels):
             rpn_proposals_np = rpn_proposals_np[rpn_proposals_np[:, 0] == img_idx]
 
         img_proposals = rpn_proposals_np[rpn_proposals_np[:, 0] == img_idx]
-        img_proposals = add_truth_box_to_proposal(img_proposals, img_idx, img_truth_boxes, img_truth_labels)
+        #img_proposals = add_truth_box_to_proposal(img_proposals, img_idx, img_truth_boxes, img_truth_labels)
 
         sampled_proposal, sampled_label, sampled_assign, sampled_target = \
             make_one_rcnn_target(cfg, img_proposals, img_truth_boxes, img_truth_labels)

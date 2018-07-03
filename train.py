@@ -210,9 +210,9 @@ class TrainClass:
 if __name__ == '__main__':
     # train rpn head
     t = TrainClass()
-    print('train RPN head')
-    t.mode = 'train_rpn'
-    t.train()
+    #print('train RPN head')
+    #t.mode = 'train_rpn'
+    #t.train()
 
     print('train RCNN head')
     t.mode = 'train_rcnn'

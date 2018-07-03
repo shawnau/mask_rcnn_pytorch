@@ -70,7 +70,7 @@ class RCNN(nn.Module):
         self.reg_loss = None
 
     def forward(self, images, features, rpn_proposals):
-        rcnn_crops = self.rcnn_crop(features, self.rpn_proposals)
+        rcnn_crops = self.rcnn_crop(features, rpn_proposals)
         self.rcnn_logits, self.rcnn_deltas = self.rcnn_head(rcnn_crops)
         self.rcnn_proposals = rcnn_nms(self.cfg, self.mode, images,
                                        rpn_proposals,
@@ -105,7 +105,7 @@ class MaskNet(nn.Module):
         self.mask_cls_loss = None
 
     def forward(self, images, features, rcnn_proposals):
-        mask_crops = self.mask_crop(features, self.detections)
+        mask_crops = self.mask_crop(features, rcnn_proposals)
         self.mask_logits = self.mask_head(mask_crops)
         self.masks, self.mask_instances, self.mask_proposals = \
             mask_nms(self.cfg, images, rcnn_proposals, self.mask_logits)
@@ -179,12 +179,15 @@ class MaskRcnnNet(nn.Module):
             total_loss = self.rpn_cls_loss + self.rpn_reg_loss
         elif self.mode in ['train_rcnn', 'valid_rcnn']:
             self.train_rcnn(images, truth_boxes, truth_labels)
-            total_loss = self.rpn_cls_loss + self.rpn_reg_loss + \
-                         self.rcnn_cls_loss + self.rcnn_reg_loss
+            loss_list = [self.rpn_cls_loss, self.rpn_reg_loss, self.rcnn_cls_loss, self.rcnn_reg_loss]
+            valid_list = [x for x in loss_list if x is not None]
+            total_loss = sum(valid_list)
         elif self.mode in ['train_all', 'valid_all']:
             self.train_all(images, truth_boxes, truth_labels, truth_instances)
-            total_loss = self.rpn_cls_loss + self.rpn_reg_loss + \
-                         self.rcnn_cls_loss + self.rcnn_reg_loss + self.mask_cls_loss
+            loss_list = [self.rpn_cls_loss, self.rpn_reg_loss, self.rcnn_cls_loss,
+                         self.rcnn_reg_loss, self.mask_cls_loss]
+            valid_list = [x for x in loss_list if x is not None]
+            total_loss = sum(valid_list)
         else:
             raise KeyError('mode %s note recognized' % self.mode)
 
